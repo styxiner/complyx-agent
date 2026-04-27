@@ -1,0 +1,3 @@
+[workspace]
+resolver = "3"
+members = ["crates/agent-core", "crates/grpc-client", "crates/local-db", "crates/policy-engine", "crates/proto", "crates/remediation-engine"]
