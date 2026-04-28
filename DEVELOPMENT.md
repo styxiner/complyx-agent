@@ -390,7 +390,7 @@ El registro ocurre una sola vez: la primera vez que el agente arranca sin certif
 ### Nomenclatura
  
 | Tipo | Convención | Ejemplo |
-|---|---|---|
+|------|------------|---------|
 | Struct de datos | `PascalCase` | `CheckResult`, `AgentConfig` |
 | Trait | `PascalCase` | `CheckExecutor`, `RemediationExecutor` |
 | Implementación concreta | `PascalCase` + nombre descriptivo | `FileLineExecutor`, `SysctlExecutor` |
@@ -404,6 +404,7 @@ El registro ocurre una sola vez: la primera vez que el agente arranca sin certif
 - El binario (`agent-core`) usa `anyhow` para errores en el setup inicial.
 - Los logs usan `tracing`: `tracing::info!`, `tracing::warn!`, `tracing::error!`. Los spans de `tracing` se añaden en `poll_loop` con el `agent_id` como campo de contexto para que todos los logs de un tick estén correlacionados.
 ### Tests
+Por falta de tiempo, es posible que no de tiempo a hacer todas las pruebas necesarias.
  
 Cada executor debería tener tests unitarios en el mismo fichero:
  

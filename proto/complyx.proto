@@ -1,0 +1,61 @@
+syntax = "proto3";
+package complyx;
+
+message PollRequest {
+  string agent_id = 1;
+  string policy_bundle_hash = 2; // Para evitar la retransmisión de políticas de forma innecesaria
+}
+
+message PollResponse {
+  bool policies_changed = 1;
+  PolicyBundle bundle = 2;
+}
+
+message PolicyBundle {
+  repeated Policy policies = 1;
+  string bundle_hash = 2;
+}
+
+message Policy {
+  string id = 1;
+  string name = 2;
+  string version = 3;
+  string severity = 4;
+  repeated PolicyElement elements = 5;
+}
+
+message PolicyElement {
+  string id = 1;
+  repeated PolicyCheck checks = 2;
+}
+
+message PolicyCheck {
+  string id = 1;
+  string name = 2;
+  string check_type = 3;
+  string check_params_json = 4;
+  repeated string regulation_section_ids = 5;
+  PolicyRemediation remediation = 6
+}
+
+message PolicyRemediation {
+  string id = 1;
+  string remediation_type = 2;
+  string remediation_params_json = 3;
+}
+
+message SubmitResultsRequest {
+  string agent_id = 1;
+  repeated CheckResult results = 2;
+}
+
+message CheckResult {
+  string check_id = 1;
+  bool passed = 2;
+  string detail = 3;
+  int64 executed_at = 4; // timestamp unix
+}
+
+message SubmitResultsResponse {
+  bool accepted = 1;
+}
