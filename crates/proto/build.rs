@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .compile(
             &["proto/complyx.proto"], //fichero a compilar
             &["proto"], // directorios para importar entre protos
-            )?;
+        )?;
 
     // Indicar a cargo que recompile este crate si el .proto cambia. Sin esto, los cambios en el
     // .proto no desencadenarán recompilación (malo ;p )
