@@ -23,7 +23,7 @@ pub struct RetryPolicy {
 }
 
 impl Default for RetryPolicy {
-    fn default() -> self {
+    fn default() -> Self {
         Self {
             max_attempts: 5,
             base_delay: Duration::from_secs(1),
@@ -71,11 +71,11 @@ impl RetryPolicy {
 
         // Jitter: Meto un XOR simple del intento con un primo para dispersión sin rand
         let jitter_range_ms = self.jitter_max.as_millis() as u64;
-        let jitter_ms = if jitter_range > 0 {
+        let jitter_ms = if jitter_range_ms > 0 {
             // Para esto uso una combinacion de bits del intento para simular aleatoriedad sin
             // añadir la dependencia de rand. Imprescindible porque los agentes tienen distintos
             // tiempos de arranque (evidentemente)
-            let pseudo = (attempt.wrapping_mul(2654435761) ^ attempt.wrapping_add(1) as u64);
+            let pseudo = attempt.wrapping_mul(2654435761) ^ attempt.wrapping_add(1) as u64;
 
             pseudo % jitter_range_ms
         } else {

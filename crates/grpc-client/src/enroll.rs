@@ -15,7 +15,7 @@
 
 use std::path::Path;
 
-use rcgen::{CertificateParams, DistinguishedName, DnType, KeyPair, ScanType, PKCS_ED25519};
+use rcgen::{CertificateParams, DistinguishedName, DnType, KeyPair, SanType, PKCS_ED25519};
 use tonic::transport::{Channel, ClientTlsConfig};
 
 use crate::GrpcError;
@@ -118,13 +118,13 @@ pub async fn enroll(enroll_url: &str, req: EnrollRequest) -> Result<EnrollResult
     let mut client = ComplyxEnrollClient::new(channel);
 
     // Enviar solicitud de registro
-    let grpc_req = protoEnrollRequest {
+    let grpc_req = ProtoEnrollRequest {
         token: req.token,
         csr_pem: csr_pem.clone(),
         hostname: req.hostname.clone(),
         os_name: req.os_name.clone(),
         os_version: req.os_version.clone(),
-    }
+    };
 
     tracing::debug!("Enviando EnrollRequest al servidor");
 

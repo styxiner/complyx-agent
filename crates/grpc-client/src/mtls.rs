@@ -23,7 +23,7 @@ pub enum TlsError {
     #[error("No se encontró ninguna clave privada en {path}")]
     NoPrivateKey {path: String},
 
-    #[error(Error al leer {path}: {source})]
+    #[error("Error al leer {path}: {source}")]
     ReadError {
         path: String,
 
@@ -37,7 +37,7 @@ pub enum TlsError {
 
 // Rutas a los 3 ficheros que componen la entidad mTLS del agente
 pub struct CertPaths {
-    pub agent_cert: std::path:PathBuf,
+    pub agent_cert: std::path::PathBuf,
     pub agent_key: std::path::PathBuf,
     pub ca_cert: std::path::PathBuf,
 }

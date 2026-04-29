@@ -37,7 +37,7 @@ pub struct GrpcClientConfig {
 struct ClientState {
     // Canal gRPC activo. None si la conexion no se ha establecido o el canal anterior fallo y esta
     // esperando reconexion
-    channel: Option<Channel>;
+    channel: Option<Channel>,
 }
 
 // cliente gRPC del agente
@@ -135,7 +135,7 @@ impl GrpcClient {
                 }
             }).await?;
 
-        tracing::debg!(
+        tracing::deubg!(
             policies_changed = response.policies_changed,
             bundle_hash = response.bundle.as_ref().map(|b| b.bundle_hash.as_str()).unwrap_or(""),
             "PollResponse recibido"

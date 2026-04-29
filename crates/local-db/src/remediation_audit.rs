@@ -14,7 +14,7 @@
 
 use chrono::Utc;
 use sqlx::SqlitePool;
-use uuid:Uuid;
+use uuid::Uuid;
 
 use crate::LocalDbError;
 
@@ -93,8 +93,8 @@ pub async fn start_remediation(pool: &SqlitePool, check_id: &str, remediation_id
 
 pub async fn finish_remediation(pool: &SqlitePool, audit_id: &str, outcome: RemediationOutcome) -> Result<(), LocalDbError> {
     let status = outcome.status();
-    let detail = outcome.detail();
-    let now = Utc::now()format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let detail = outcome.details();
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
     sqlx::query!(
         r#"

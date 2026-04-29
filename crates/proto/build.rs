@@ -24,23 +24,44 @@
 //! * build_server(true), build_client(false)
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+//   let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+//    
+//    let proto_dir = manifest.join("../../proto");
+//    let proto_file = proto_dir.join("complyx.proto");
+//
+//
+//    tonic_build::configure()
+//        .build_server(false)
+//        .build_client(true)
+//
+//// no ?       // Añadir derives adicionales a los structs generados para poder clonarlos. Necesario en
+//// no ?       // retry.rs donde los requests se clonan en cada reintento y serializarlos con serde para
+//// no ?       // debug y persistencia en local-db.
+//        // Rutas: Ficheros .proto y directorios donde buscar imports
+//        .compile(
+//            &[proto_file)], //fichero a compilar
+//            &[proto_dir.clone()], // directorios para importar entre protos
+//        )?;
+//
+//    // Indicar a cargo que recompile este crate si el .proto cambia. Sin esto, los cambios en el
+//    // .proto no desencadenarán recompilación (malo ;p )
+//    println!("cargo:rerun-if-changed={}", proto_file.display());
+//
+//    Ok(())
+    
+    let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let proto_dir = manifest.join("../../proto");
+    
+    let proto_file = proto_dir.join("complyx.proto");
+    
     tonic_build::configure()
         .build_server(false)
         .build_client(true)
-
-        // Añadir derives adicionales a los structs generados para poder clonarlos. Necesario en
-        // retry.rs donde los requests se clonan en cada reintento y serializarlos con serde para
-        // debug y persistencia en local-db.
-        .type_attribute(".", "#[derive(Clone)]")
-        // Rutas: Ficheros .proto y directorios donde buscar imports
-        .compile(
-            &["proto/complyx.proto"], //fichero a compilar
-            &["proto"], // directorios para importar entre protos
-        )?;
-
-    // Indicar a cargo que recompile este crate si el .proto cambia. Sin esto, los cambios en el
-    // .proto no desencadenarán recompilación (malo ;p )
-    println!("cargo:rerun-if-changed=proto/complyx.proto");
+        .compile(&[proto_file.clone()], &[proto_dir.clone()])?;
+    
+    println!("cargo:rerun-if-changed={}", proto_file.display());
 
     Ok(())
 }
+
+

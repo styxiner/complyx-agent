@@ -36,7 +36,7 @@ pub enum GrpcError {
 
     // Error al leer ficheros del sistema de ficheros (certificados o claves).
     #[error("error de E/S: {0}")]
-    Tls(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
 }
 
 impl From<tonic::Status> for GrpcError {

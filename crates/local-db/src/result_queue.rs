@@ -45,13 +45,13 @@ pub struct QueueRow {
 // Errores
 //
 // * `LocalDbError::Database` si falla la transaccion SQLite
-pub async fn enqueue(pool: &SqlitePool, results: $[CheckResult]) -> Result<(), LocalDbError> {
+pub async fn enqueue(pool: &SqlitePool, results: &[CheckResult]) -> Result<(), LocalDbError> {
     if results.is_empty() {
         return Ok(());
     }
 
     let mut tx = pool.begin().await.map_err(LocalDbError::Database)?;
-    let row = Utc::now().format!("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let row = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
     let mut inserted = 0usize;
 
@@ -188,7 +188,7 @@ pub async fn mark_sent(pool: &SqlitePool, ids: &[String]) -> Result<(), LocalDbE
         return Ok(());
     }
 
-    let now Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
     let query = format!("UPDATE result_queue SET status = 'sent', sent_at = ? WHERE id IN ({placeholders})");
 

@@ -53,7 +53,7 @@ message PolicyCheck {
   string check_type = 3;
   string check_params_json = 4;
   repeated string regulation_section_ids = 5;
-  PolicyRemediation remediation = 6
+  PolicyRemediation remediation = 6;
 }
 
 message PolicyRemediation {

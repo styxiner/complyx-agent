@@ -24,7 +24,7 @@ use crate::LocalDbError;
 // Journal mode WAL (Write-Ahead Logging) permite lecturas concurrentes mientras hay una escritura
 // en curso. Se configura mas que nada porque el agente tiene varias tareas asincronas (poll_loop +
 // result_flush + cert_renew).
-pub async fn connect(db_path: impl AsRef<Path>) -> Result<SqlitePoll, LocalDbError> {
+pub async fn connect<SqlitePoll>(db_path: impl AsRef<Path>) -> Result<SqlitePoll, LocalDbError> {
     let path = db_path.as_ref();
 
     // Crea directorios intermedios si no existen
@@ -43,7 +43,7 @@ pub async fn connect(db_path: impl AsRef<Path>) -> Result<SqlitePoll, LocalDbErr
         .journal_mode(SqliteJournalMode::Wal) // Modo WAL: lecturas concurrentes con escrituras
         .synchronous(SqliteSynchronous::Normal) // NORMAL: fsync solo en checkpoints WAL. Para
                                                 // balancear rendimiento/durabilidad
-        .busy_timeour(std::time::Duration::from_secs(5)) // Timeout si otra conexion tiene el lock
+        .busy_timeout(std::time::Duration::from_secs(5)) // Timeout si otra conexion tiene el lock
                                                          // de escritura
         .pragma("cache_size", "-4000") // Cache de paginas en memoria (4MB). Mejora lecturas
                                        // repetidas del bundle
