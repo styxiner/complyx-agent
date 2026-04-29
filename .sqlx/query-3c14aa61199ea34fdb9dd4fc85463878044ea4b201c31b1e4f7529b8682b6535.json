@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO remediation_audit (id, check_id, remediation_id, remediation_type, params_json, status, started_at)\n        VALUES (?, ?, ?, ?, ?, 'pending', ?)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "3c14aa61199ea34fdb9dd4fc85463878044ea4b201c31b1e4f7529b8682b6535"
+}

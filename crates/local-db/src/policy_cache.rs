@@ -63,7 +63,7 @@ pub async fn save_bundle(pool: &SqlitePool, bundle: &PolicyBundle) -> Result<(),
 // * `LocalDbError::Database` si falla la lectura de SQLite
 
 pub async fn  load_bundle(pool: &SqlitePool) -> Result<Option<PolicyBundle>, LocalDbError> {
-    let row = sqlx::query!("SELECT data_json FROM policy_bundle WHERE key = 'current")
+    let row = sqlx::query!("SELECT data_json FROM policy_bundle WHERE key = 'current'")
         .fetch_optional(pool)
         .await
         .map_err(LocalDbError::Database)?;
@@ -95,7 +95,7 @@ pub async fn  load_bundle(pool: &SqlitePool) -> Result<Option<PolicyBundle>, Loc
 // Este hash es el que el agente envia en cada `PollRequest` para que el servidor pueda detectar si
 // el bundle ha cambiado sin retransmitirlo completo.
 pub async fn get_bundle_hash(pool: &SqlitePool) -> Result<Option<String>, LocalDbError> {
-    let row = sqlx::query!("SELECT hash FROM policy_bundle WHERE key = 'current")
+    let row = sqlx::query!("SELECT hash FROM policy_bundle WHERE key = 'current'")
         .fetch_optional(pool)
         .await
         .map_err(LocalDbError::Database)?;

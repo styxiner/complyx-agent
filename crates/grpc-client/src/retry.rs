@@ -75,14 +75,14 @@ impl RetryPolicy {
             // Para esto uso una combinacion de bits del intento para simular aleatoriedad sin
             // añadir la dependencia de rand. Imprescindible porque los agentes tienen distintos
             // tiempos de arranque (evidentemente)
-            let pseudo = attempt.wrapping_mul(2654435761) ^ attempt.wrapping_add(1) as u64;
+            let pseudo = attempt.wrapping_mul(2654435761) ^ attempt.wrapping_add(1);
 
-            pseudo % jitter_range_ms
+            pseudo % jitter_range_ms as u32
         } else {
             0
         };
 
-        let total_ms = backoff_ms.saturating_add(jitter_ms);
+        let total_ms = backoff_ms.saturating_add(jitter_ms.into());
         let capped_ms = total_ms.min(self.max_delay.as_millis() as u64);
 
         Duration::from_millis(capped_ms)
@@ -93,7 +93,7 @@ impl RetryPolicy {
     pub fn is_retryable(code: Code) -> bool {
         matches!(
             code,
-            Code::Unaviable // no hay conexion
+            Code::Unavailable // no hay conexion
             | Code::DeadlineExceeded // timeout de la llamada
             | Code::ResourceExhausted // rate limit
             | Code::Aborted // conflicto transitorio, reintentar

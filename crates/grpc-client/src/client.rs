@@ -65,12 +65,24 @@ impl GrpcClient {
         let cert_paths = CertPaths::from_dir(&config.cert_dir);
         let tls_config = crate::mtls::build_tls_config(&cert_paths).await?;
 
-        let channel = Channel::from_shared(config.server_url.clone())
-            .map_err(|e| {
-                // uri invalida. Convertir al error de transporte de tonic
-                tonic::transport::Error::from(e)
-            })
-            .and_then(|b| Ok(b.tls_config(tls_config)?))?
+//        let channel = Channel::from_shared(config.server_url.clone())
+//            .map_err(|e| {
+//                // uri invalida. Convertir al error de transporte de tonic
+//                GrpcError::ConnectionFailed {attempts: 1, source: e, }
+//            })
+//            .and_then(|b| Ok(b.tls_config(tls_config)?))?
+//            .connect_lazy();
+
+//        let channel = Channel::from_shared(config.server_url.clone())
+//            .map_err(|e| GrpcError::Transport(e.into()))?
+//            .tls_config(tls_config)
+//            .map_err(GrpcError::Transport)?
+//            .connect_lazy();
+
+        let channel = Channel::from_shared(config.server_url.clone())? // ? convierte InvalidUri en
+        // GrpcError::InvalidUrl
+            .tls_config(tls_config)
+            .map_err(GrpcError::Transport)?
             .connect_lazy();
 
         tracing::info!(
@@ -121,21 +133,34 @@ impl GrpcClient {
             "Enviando PollRequest"
             );
 
+//        let response = self
+//            .with_retry_policy(|mut client| {
+//                let req = PollRequest {
+//                    agent_id: agent_id.clone(),
+//                    policy_bundle_hash: hash.clone(),
+//                };
+//                async move {
+//                    client
+//                        .poll_policies(req)
+//                        .await
+//                        .map(|r| r.into_inner())
+//                }
+//            })?;
+
         let response = self
             .with_retry(|mut client| {
                 let req = PollRequest {
                     agent_id: agent_id.clone(),
                     policy_bundle_hash: hash.clone(),
                 };
-                async move {
-                    client
-                        .poll_policies(req)
-                        .await
-                        .map(|r| r.into_inner())
-                }
-            }).await?;
 
-        tracing::deubg!(
+                async move {
+                    client.poll_policies(req).await.map(|r| r.into_inner())
+                }
+            })
+            .await?;
+
+        tracing::debug!(
             policies_changed = response.policies_changed,
             bundle_hash = response.bundle.as_ref().map(|b| b.bundle_hash.as_str()).unwrap_or(""),
             "PollResponse recibido"
@@ -156,7 +181,7 @@ impl GrpcClient {
     // Errores
     // * Devuelve `GrpcError` si el servidor rechaza los resultados o hay error de red.
     //
-    pub async fn submit_results(&self, results: Vec<ProtoCheckResult>) -> Result<SubmitResultsResponse, GrpcError> -> {
+    pub async fn submit_results(&self, results: Vec<ProtoCheckResult>) -> Result<SubmitResultsResponse, GrpcError> {
         let agent_id = self.config.agent_id.clone();
         let count = results.len();
 
@@ -169,7 +194,7 @@ impl GrpcClient {
         let response = self.with_retry(|mut client| {
             let req = SubmitResultsRequest {
                 agent_id: agent_id.clone(),
-                results = results.clone(),
+                results: results.clone(),
             };
 
             async move {
@@ -220,23 +245,58 @@ impl GrpcClient {
     // Ejecuta una llamada gRPC con la politica de reintentos configurada.
     // `f` recibe un `ComplyxAgentClient<Channel>` listo para usar. Si la llamada falla en un error
     // retryable, se reintenta obteniendo un cliente fresco (que puede haber reeconectado)
-    async fn with_retry<F, Fut, T>(&self, mut f: F) -> Result<T, GrpcError> where F: FnMut(ComplyxAgentClient<Channel>) -> Fut, Fut: std::future::Future<Output = Result<T, tonic::Status>> {
+    async fn with_retry<F, Fut, T>(&self, mut f: F) -> Result<T, GrpcError>
+    where
+        F: FnMut(ComplyxAgentClient<Channel>) -> Fut,
+        Fut: Future<Output = Result<T, tonic::Status>>,
+    {
         let policy = self.retry_policy.clone();
-
-        // Captura una referencia al estado para cerrar el retry
         let state = Arc::clone(&self.state);
         let config = self.config.clone();
-
-        policy.execute(|| {
-            let state = Arc::clone(&state);
-            let config = config.clone();
-
-            async move {
-                let client = Self::get_or_reconnect(&state, &config).await?;
-
-                f(client).await
+        let mut last_error: Option<tonic::Status> = None;
+    
+        for attempt in 0..policy.max_attempts {
+            let client = match Self::get_or_reconnect(&state, &config).await {
+                Ok(c) => c,
+                Err(s) => {
+                    last_error = Some(s);
+                    break;
+                }
+            };
+    
+            match f(client).await {
+                Ok(value) => {
+                    if attempt > 0 {
+                        tracing::info!(attempt, "llamada gRPC exitosa tras reintento");
+                    }
+                    return Ok(value);
+                }
+                Err(status) if !RetryPolicy::is_retryable(status.code()) => {
+                    return Err(GrpcError::from(status));
+                }
+                Err(status) => {
+                    let remaining = policy.max_attempts - attempt - 1;
+                    if remaining == 0 {
+                        last_error = Some(status);
+                        break;
+                    }
+                    let delay = policy.delay_for_attempt(attempt);
+                    tracing::warn!(
+                        attempt = attempt + 1,
+                        max_attempts = policy.max_attempts,
+                        delay_ms = delay.as_millis(),
+                        code = ?status.code(),
+                        "error gRPC transitorio, reintentando..."
+                    );
+                    tokio::time::sleep(delay).await;
+                    last_error = Some(status);
+                }
             }
-        }).await.map_err(GrpcError::from)
+        }
+
+        Err(GrpcError::from(last_error.unwrap_or_else(|| {
+            tonic::Status::internal("reintentos agotados sin error registrado")
+        })))
     }
 
     // Obtiene el cliente del canal activo, o lo reconstruye si hace falta.

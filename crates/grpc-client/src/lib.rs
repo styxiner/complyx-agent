@@ -15,7 +15,7 @@ pub use retry::RetryPolicy;
 pub use proto::complyx::{CheckResult, Policy, PolicyBundle, PollResponse, SubmitResultsResponse};
 
 // Errores que puede producir el cliente gRPC
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error, Debug)]
 pub enum GrpcError {
     // El servidor devuelve un error gRPC con codigo y mensaje
     #[error("Error gRPC ({code}): {message}")]
@@ -25,10 +25,15 @@ pub enum GrpcError {
     #[error("no se ha podido conectar al servidor tras {attempts} intentos: {source}")]
     ConnectionFailed {
         attempts: u32,
-
         #[source]
         source: tonic::transport::Error
     },
+
+    #[error("error de transporte gRPC: {0}")]
+    Transport(#[from] tonic::transport::Error),
+
+    #[error("url del servidor invalida: {0}")]
+    InvalidUrl(#[from] tonic::codegen::http::uri::InvalidUri),
 
     // Error al cargar la configuracion TLS
     #[error("Error de configuracion TLS: {0}")]

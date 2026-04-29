@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT id, check_id, data_json, retries\n        FROM result_queue\n        WHERE status = 'pending' AND retries < ?\n        ORDER BY created_at ASC\n        LIMIT ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "check_id",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "data_json",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "retries",
+        "ordinal": 3,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f920619b67d71e6a966a3732ce9b34021207d25be591de37165d966c177c30e3"
+}

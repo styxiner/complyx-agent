@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE remediation_audit\n        SET status = ?, result_detail = ?, finished_at = ?\n        WHERE id = ?\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "8e79cf2d15924309acfa0ee629bf982dc597ffbcc676d9812ea0996d889384be"
+}

@@ -51,15 +51,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let proto_dir = manifest.join("../../proto");
-    
     let proto_file = proto_dir.join("complyx.proto");
     
+//    tonic_build::configure()
+//        .build_server(false)
+//        .build_client(true)
+//        .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
+//        .compile(&[&proto_file.clone()], &[&proto_dir.clone()])?;
+//
+//
+////    tonic_build::configure()
+////        .build_server(false)
+////        .build_client(true)
+////        .compile_with_config(prost_config, &[&proto_file], &[&proto_dir]
+////        )?;
+//
+//
+//    println!("cargo:rerun-if-changed={}", proto_file.display());
+//
+//    Ok(())
+
+//    tonic_build::configure()
+//        .build_server(false)
+//        .build_client(true)
+//        .compile(&[&proto_file], &[&proto_dir]
+//        )?;
+//
+//    println!("cargo:rerun-if-changed={}", proto_dir.display());
+
+    let mut prost_config = prost_build::Config::new();
+
+    prost_config.type_attribute(
+        ".",
+        "#[derive(serde::Serialize, serde::Deserialize)]"
+    );
+
     tonic_build::configure()
         .build_server(false)
         .build_client(true)
-        .compile(&[proto_file.clone()], &[proto_dir.clone()])?;
-    
-    println!("cargo:rerun-if-changed={}", proto_file.display());
+        .compile_with_config(
+            prost_config,
+            &[&proto_file],
+            &[&proto_dir],
+        )?;
 
     Ok(())
 }

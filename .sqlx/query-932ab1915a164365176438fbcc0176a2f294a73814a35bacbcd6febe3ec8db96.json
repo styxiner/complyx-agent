@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO policy_bundle (key, hash, data_json, cached_at)\n        VALUES ('current', ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))\n        ON CONFLICT (key) DO UPDATE SET\n            hash = excluded.hash,\n            data_json = excluded.data_json,\n            cached_at = excluded.cached_at\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "932ab1915a164365176438fbcc0176a2f294a73814a35bacbcd6febe3ec8db96"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE result_queue SET status = 'pending' WHERE status = 'sending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "34f019db4532b9a891985f5a939564af405166f669786195577c8ccedac8856d"
+}

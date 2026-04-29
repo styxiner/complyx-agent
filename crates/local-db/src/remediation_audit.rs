@@ -116,11 +116,11 @@ pub async fn finish_remediation(pool: &SqlitePool, audit_id: &str, outcome: Reme
             tracing::info!(audit_id, "remediacion aplicada con exito");
         }
 
-        RemediationOutcome::Failed { .. } => {
+        RemediationOutcome::Failed { reason, .. } => {
             tracing::error!(audit_id, reason, "remediacion fallida");
         }
 
-        RemediationOutcome::Skipped { .. } => {
+        RemediationOutcome::Skipped { reason, .. } => {
             tracing::warn!(audit_id, reason, "remediacion omitida");
         }
     }

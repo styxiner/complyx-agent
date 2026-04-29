@@ -58,7 +58,9 @@ impl CertPaths {
     // Devuelve true si los 3 ficheros existen.
     // Se usa en el arranque para detectar si el agente ya está registrado.
     pub fn all_exist(&self) -> bool {
-        self.agent_crt.exists() && self.agent_key.exists() && self.agent_ca.exists()
+        self.agent_cert.exists() && 
+        self.agent_key.exists() && 
+        self.ca_cert.exists()
     }
 }
 
@@ -77,7 +79,7 @@ pub async fn build_tls_config(paths: &CertPaths) -> Result<ClientTlsConfig, TlsE
     // vez de un panic interno de rustls
     validate_cert_pem(&agent_cert_pem, &paths.agent_cert)?;
     validate_key_pem(&agent_key_pem, &paths.agent_key)?;
-    validate_cert_pem(&ca_cert_pem, &paths.agent_ca)?;
+    validate_cert_pem(&ca_cert_pem, &paths.ca_cert)?;
 
     // Identity = cert de cliente + clave privada
     let identity = Identity::from_pem(&agent_cert_pem, &agent_key_pem);
@@ -93,7 +95,7 @@ pub async fn build_tls_config(paths: &CertPaths) -> Result<ClientTlsConfig, TlsE
         "Configuracion mTLS construida correctamente"
         );
 
-    Ok(tls_config);
+    Ok(tls_config)
 }
 
 // helpers para formar la configuracion mTLS

@@ -82,9 +82,9 @@ impl LocalDb {
     // Devuelve el hash del bundle en cache para incluirlo en el `PollRequest`. Cadena vacia si no
     // hay bundle cacheado
     pub async fn get_bundle_hash(&self) -> Result<String, LocalDbError> {
-        Ok(policy_cache::get_bundle_hash(&self.pool))
-        .await?
-        .unwrap_or_default()
+        Ok(policy_cache::get_bundle_hash(&self.pool).await?
+        .ok_or(LocalDbError::Database) // añade variante de NotFound o:
+        .unwrap_or_default())
     }
 
     // Elimina el bundle de la cache. Se usa al des registrar un agente

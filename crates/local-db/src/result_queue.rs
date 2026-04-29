@@ -51,7 +51,7 @@ pub async fn enqueue(pool: &SqlitePool, results: &[CheckResult]) -> Result<(), L
     }
 
     let mut tx = pool.begin().await.map_err(LocalDbError::Database)?;
-    let row = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
     let mut inserted = 0usize;
 

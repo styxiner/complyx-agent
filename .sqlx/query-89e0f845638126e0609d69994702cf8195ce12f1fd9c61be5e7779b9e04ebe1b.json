@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM policy_bundle WHERE key = 'current'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "89e0f845638126e0609d69994702cf8195ce12f1fd9c61be5e7779b9e04ebe1b"
+}
