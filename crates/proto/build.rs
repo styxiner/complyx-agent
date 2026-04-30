@@ -89,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_build::configure()
         .build_server(false)
         .build_client(true)
-        .compile_with_config(
+        .compile_protos_with_config(
             prost_config,
             &[&proto_file],
             &[&proto_dir],

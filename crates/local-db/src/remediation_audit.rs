@@ -73,7 +73,7 @@ pub async fn start_remediation(pool: &SqlitePool, check_id: &str, remediation_id
         )
         .execute(pool)
         .await
-        .map_err(LocalDbError::Database);
+        .map_err(LocalDbError::Database)?;
 
     tracing::debug!(
         audit_id = %id,

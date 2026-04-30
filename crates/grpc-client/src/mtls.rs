@@ -10,7 +10,7 @@
 
 use std::path::Path;
 
-use rustls::{pki_types::{CertificateDer, PrivateKeyDer}, ClientConfig, RootCertStore};
+//use rustls::{pki_types::{CertificateDer, PrivateKeyDer}, ClientConfig, RootCertStore};
 use rustls_pemfile::{certs, private_key};
 use tonic::transport::{Certificate, ClientTlsConfig, Identity};
 
