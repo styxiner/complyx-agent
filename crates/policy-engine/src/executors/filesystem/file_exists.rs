@@ -127,7 +127,7 @@ impl CheckExecutor for FileExistsExecutor {
 
             if let Some(expected_mode) = &p.mode {
                 let actual_mode = format!("{:04o}", meta.mode() & 0o7777);
-                // Normalizamos: "600" → "0600"
+                // Normalizamos con sticky bit o suid: "600" → "0600" 
                 let expected_norm = normalize_mode(expected_mode);
                 if actual_mode != expected_norm {
                     return Ok(EngineCheckResult::fail(
@@ -151,5 +151,81 @@ impl CheckExecutor for FileExistsExecutor {
             "existente",
             format!("'{}' existe y cumple todos los requisitos", p.path.display()),
         ))
+    }
+}
+
+fn file_type_str(t: &FileType) -> &'static str {
+    match t {
+        FileType::File => "file",
+        FileType::Dir => "dir",
+        FileType::Symlink => "symlink",
+    }
+}
+
+fn normalize_mode(mode: &str) -> String {
+    if mode.len() == 3 {
+        format!("0{mode}")
+    } else {
+        mode.to_string()
+    }
+}
+
+#[cfg(unix)]
+fn uid_to_name(uid: u32) -> Option<String> {
+    // Para siguientes verisones usar nix::unistd::User::from_uid, pero por no meter mas cosas lo
+    // hago leyendo /etc/passwd directamente y listo.
+    let passws = std::fs::read_to_string("/etc/passwd").ok()?;
+
+    for line in passwd.lines() {
+        let parts: Vec<&str> = line.split(':').collect();
+        if parts.len() >= 3 && parts[2].parse::<u32>().ok()? == uid {
+            return Some(parts[0].to_string());
+        }
+    }
+
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use tempfile::tempdir;
+ 
+    #[tokio::test]
+    async fn passes_for_existing_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.txt");
+        tokio::fs::write(&path, b"content").await.unwrap();
+ 
+        let result = FileExistsExecutor
+            .execute("chk-1", &json!({ "path": path, "file_type": "file" }))
+            .await
+            .unwrap();
+ 
+        assert!(result.passed);
+    }
+ 
+    #[tokio::test]
+    async fn fails_for_missing_file() {
+        let result = FileExistsExecutor
+            .execute("chk-1", &json!({ "path": "/tmp/this_does_not_exist_complyx" }))
+            .await
+            .unwrap();
+ 
+        assert!(!result.passed);
+        assert!(result.detail.contains("no existe"));
+    }
+ 
+    #[tokio::test]
+    async fn fails_when_type_mismatch() {
+        let dir = tempdir().unwrap();
+ 
+        let result = FileExistsExecutor
+            .execute("chk-1", &json!({ "path": dir.path(), "file_type": "file" }))
+            .await
+            .unwrap();
+ 
+        assert!(!result.passed);
     }
 }
