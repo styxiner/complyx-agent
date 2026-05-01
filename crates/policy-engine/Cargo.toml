@@ -16,6 +16,8 @@ thiserror = "1"
 tracing = "0.1"
 chrono = "0.4"
 
+proto = { path = "../proto" }
+
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tempfile = "3"

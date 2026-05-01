@@ -1,24 +1,11 @@
-//! Check `pkg_absent`: verifica que un paquete NO está instalado en el sistema.
-//!
-//! Útil para hardening: paquetes de acceso remoto inseguro (telnet, rsh),
-//! compiladores en servidores de producción, etc.
-//!
-//! ## Ejemplo de uso
-//!
-//! ```json
-//! {
-//!   "type": "pkg_absent",
-//!   "name": "telnetd",
-//!   "reason": "CIS Benchmark 2.1.1: telnet server must not be installed"
-//! }
-//! ```
+//! Check `pkg_absent`: verifica que un paquete NO esta instalado en el sistema.
 
 use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::executor::CheckExecutor;
 use crate::result::{CheckError, EngineCheckResult};
-use super::pkg_installed::{PackageManager, PkgInstalledExecutor};
+use super::pkg_installed::{PackageManager, query_package, resolve_package_manager};
 
 pub struct PkgAbsentExecutor;
 
@@ -27,53 +14,57 @@ struct Params {
     name: String,
 
     #[serde(default)]
-    reason: Option<String>, // Por temas de auditoria
+    reason: Option<String>,
 
     #[serde(default)]
-    package_manager: PackageManager, // Gestor de paquetes. `"auto"` detecta automáticamente.
+    package_manager: PackageManager,
 }
 
 #[async_trait]
 impl CheckExecutor for PkgAbsentExecutor {
     fn check_type(&self) -> &'static str { "pkg_absent" }
 
-    async fn execute(&self, check_id: &str, params: &serde_json::Value,) -> Result<EngineCheckResult, CheckError> {
+    async fn execute(
+        &self,
+        check_id: &str,
+        params: &serde_json::Value,
+    ) -> Result<EngineCheckResult, CheckError> {
         let p: Params = serde_json::from_value(params.clone())
             .map_err(|e| CheckError::invalid_params("pkg_absent", e))?;
 
-        // Reutilizamos la lógica de consulta de pkg_installed
-        let installed_params = serde_json::json!({
-            "name": p.name,
-            "package_manager": p.package_manager,
-        });
+        let pm = resolve_package_manager(&p.package_manager).await;
 
-        // Ejecutamos pkg_installed internamente para ver si está instalado
-        let installed_result = PkgInstalledExecutor
-            .execute("_internal", &installed_params)
-            .await?;
+        let installed = query_package(&pm, &p.name)
+            .await
+            .map_err(|e| CheckError::Internal {
+                check_type: "pkg_absent".into(),
+                reason: e,
+            })?;
 
-        if installed_result.actual_value == "no instalado" || !installed_result.passed {
-            // El paquete no está instalado: correcto
-            Ok(EngineCheckResult::pass(
+        match installed {
+            None => Ok(EngineCheckResult::pass(
                 check_id,
                 "no instalado",
                 "no instalado",
-                format!("paquete '{}' no está instalado (correcto)", p.name),
-            ))
-        } else {
-            // El paquete está instalado. Fallo
-            let reason_note = p
-                .reason
-                .as_deref()
-                .map(|r| format!(" — {}", r))
-                .unwrap_or_default();
+                format!("paquete '{}' no esta instalado (correcto)", p.name),
+            )),
+            Some(version) => {
+                let reason_note = p
+                    .reason
+                    .as_deref()
+                    .map(|r| format!(" — {}", r))
+                    .unwrap_or_default();
 
-            Ok(EngineCheckResult::fail(
-                check_id,
-                &format!("instalado ({})", installed_result.actual_value),
-                "no instalado",
-                format!("paquete '{}' está instalado pero no debería{}", p.name, reason_note),
-            ))
+                Ok(EngineCheckResult::fail(
+                    check_id,
+                    &format!("instalado ({})", version),
+                    "no instalado",
+                    format!(
+                        "paquete '{}' esta instalado pero no deberia{}",
+                        p.name, reason_note,
+                    ),
+                ))
+            }
         }
     }
 }
@@ -85,7 +76,6 @@ mod tests {
 
     #[tokio::test]
     async fn passes_for_nonexistent_package() {
-        // Este paquete no debería existir en ningún sistema de CI
         let result = PkgAbsentExecutor
             .execute("chk-1", &json!({
                 "name": "complyx-test-nonexistent-package-xyz-9999"

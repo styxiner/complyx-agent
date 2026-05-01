@@ -27,27 +27,33 @@ pub struct PkgInstalledExecutor;
 #[derive(Deserialize, Default, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum PackageManager {
+    /// Detección automática según los binarios disponibles en el sistema.
     #[default]
     Auto,
-
-    Dpkg, // Sistemas Debian/Ubuntu: `dpkg-query`
-    Rpm, // Sistemas RHEL/Fedora/SUSE: `rpm`
-    Pacman, // Arch Linux: `pacman`
+    /// Sistemas Debian/Ubuntu: `dpkg-query`
+    Dpkg,
+    /// Sistemas RHEL/Fedora/SUSE: `rpm`
+    Rpm,
+    /// Arch Linux: `pacman`
+    Pacman,
 }
 
 #[derive(Deserialize)]
 struct Params {
+    /// Nombre del paquete tal como lo conoce el gestor.
     name: String,
 
+    /// Versión esperada. Si se omite, solo verifica que el paquete está instalado.
     #[serde(default)]
-    version: Option<String>, // Versión esperada. Si se omite, solo verifica que el paquete está instalado.
+    version: Option<String>,
 
+    /// Operador para comparar versiones. Solo aplica si `version` está presente.
     #[serde(default = "default_operator")]
-    operator: CompareOperator, // Operador para comparar versiones. Solo aplica si `version` está presente.
+    operator: CompareOperator,
 
+    /// Gestor de paquetes a usar. `"auto"` detecta automáticamente.
     #[serde(default)]
-    package_manager: PackageManager, // Gestor de paquetes a usar. `"auto"` detecta automáticamente.
-
+    package_manager: PackageManager,
 }
 
 fn default_operator() -> CompareOperator { CompareOperator::Eq }
@@ -56,7 +62,11 @@ fn default_operator() -> CompareOperator { CompareOperator::Eq }
 impl CheckExecutor for PkgInstalledExecutor {
     fn check_type(&self) -> &'static str { "pkg_installed" }
 
-    async fn execute(&self, check_id: &str, params: &serde_json::Value,) -> Result<EngineCheckResult, CheckError> {
+    async fn execute(
+        &self,
+        check_id: &str,
+        params: &serde_json::Value,
+    ) -> Result<EngineCheckResult, CheckError> {
         let p: Params = serde_json::from_value(params.clone())
             .map_err(|e| CheckError::invalid_params("pkg_installed", e))?;
 
@@ -86,7 +96,7 @@ impl CheckExecutor for PkgInstalledExecutor {
                     )),
                     Some(expected_ver) => {
                         // Comparar versiones usando el operador configurado.
-                        // Para versiones de paquetes uso una comparación semántica simplificada:
+                        // Para versiones de paquetes usamos comparación semántica simplificada:
                         // primero intentamos numérica, si falla comparamos lexicográficamente.
                         let passed = compare_versions(&p.operator, &actual_ver, expected_ver);
                         let expected_str = format!("{} {}", p.operator, expected_ver);
@@ -106,9 +116,9 @@ impl CheckExecutor for PkgInstalledExecutor {
     }
 }
 
-// Determina el gestor de paquetes a usar.
-// En modo `Auto`, prueba en orden: dpkg → rpm → pacman.
-async fn resolve_package_manager(pm: &PackageManager) -> PackageManager {
+/// Determina el gestor de paquetes a usar.
+/// En modo `Auto`, prueba en orden: dpkg → rpm → pacman.
+pub(super) async fn resolve_package_manager(pm: &PackageManager) -> PackageManager {
     if *pm != PackageManager::Auto {
         return pm.clone();
     }
@@ -129,9 +139,9 @@ async fn resolve_package_manager(pm: &PackageManager) -> PackageManager {
     PackageManager::Dpkg
 }
 
-// Consulta si `pkg_name` está instalado y devuelve su versión.
-// Devuelve `None` si el paquete no está instalado.
-async fn query_package(pm: &PackageManager, pkg_name: &str) -> Result<Option<String>, String> {
+/// Consulta si `pkg_name` está instalado y devuelve su versión.
+/// Devuelve `None` si el paquete no está instalado.
+pub(super) async fn query_package(pm: &PackageManager, pkg_name: &str) -> Result<Option<String>, String> {
     let (program, args) = match pm {
         PackageManager::Dpkg | PackageManager::Auto => (
             "dpkg-query",
@@ -149,7 +159,8 @@ async fn query_package(pm: &PackageManager, pkg_name: &str) -> Result<Option<Str
 
     let output = tokio::process::Command::new(program)
         .args(&args)
-        .output() // Sin shell: los argumentos se pasan directamente al binario
+        // Sin shell: los argumentos se pasan directamente al binario
+        .output()
         .await
         .map_err(|e| format!("no se pudo ejecutar '{}': {}", program, e))?;
 
@@ -164,7 +175,7 @@ async fn query_package(pm: &PackageManager, pkg_name: &str) -> Result<Option<Str
         return Ok(None);
     }
 
-    // extraer la version de "nombre versión" de pac man
+    // pacman devuelve "nombre versión", extraemos solo la versión
     let version = if *pm == PackageManager::Pacman {
         version_raw
             .split_whitespace()
@@ -178,14 +189,15 @@ async fn query_package(pm: &PackageManager, pkg_name: &str) -> Result<Option<Str
     Ok(Some(version))
 }
 
-// Compara dos versiones de paquete usando el operador dado.
-//
-// 1. Intenta extraer el primer componente numérico (major version) y comparar numéricamente.
-// 2. Si falla (versiones no numéricas), compara lexicográficamente.
-//
-// Esto cubre la mayoria de casos de uso reales. Para comparar versiones completas como semver o
-// debian/rpm habría que hacer otra librería (la cual ni de coña la hago ahora) la cual añadiría
-// dependencias innecesarias para la mayoria de chequeos.
+/// Compara dos versiones de paquete usando el operador dado.
+///
+/// Estrategia:
+/// 1. Intenta extraer el primer componente numérico (major version) y comparar numéricamente.
+/// 2. Si falla (versiones no numéricas), compara lexicográficamente.
+///
+/// Esta estrategia cubre el 90% de los casos de uso reales. Para comparación de versiones
+/// completa (semver o versiones Debian/RPM) se necesitaría una librería especializada,
+/// que añadiría dependencias innecesarias para la mayoría de checks.
 fn compare_versions(op: &CompareOperator, actual: &str, expected: &str) -> bool {
     // Extraer solo los dígitos iniciales para comparación numérica del major
     let actual_num = extract_version_number(actual);
@@ -205,8 +217,8 @@ fn compare_versions(op: &CompareOperator, actual: &str, expected: &str) -> bool 
     }
 }
 
-// Extrae el número de versión principal (antes del primer `-`, `+`, `~` o letra).
-// Ejemplo: "2.9.1-1ubuntu3" → Some(2.91) no es preciso; mejor: comparamos por partes.
+/// Extrae el número de versión principal (antes del primer `-`, `+`, `~` o letra).
+/// Ejemplo: "2.9.1-1ubuntu3" → Some(2.91) no es preciso; mejor: comparamos por partes.
 fn extract_version_number(version: &str) -> Option<f64> {
     // Tomamos solo los caracteres que forman la versión base: dígitos y puntos
     let base: String = version

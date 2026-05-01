@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use serde::Deserialize;
 
-use crate::executor::CheckResult;
+use crate::executor::CheckExecutor;
 use crate::result::{CheckError, EngineCheckResult};
 
 pub struct FileExistsExecutor;
@@ -23,6 +23,7 @@ struct Params {
     #[serde(default)]
     group: Option<String>,
 
+    /// Permisos en notación octal como string (ej. "0600", "0644").
     #[serde(default)]
     mode: Option<String>,
 }
@@ -37,11 +38,13 @@ enum FileType {
 
 #[async_trait]
 impl CheckExecutor for FileExistsExecutor {
-    fn check_type(&self) -> &'static str {
-        "file_exists"
-    }
+    fn check_type(&self) -> &'static str { "file_exists" }
 
-    async fn execute (&self, check_id: &str, params: &serde_json::Value,) -> Result<EngineCheckResult, CheckError> {
+    async fn execute(
+        &self,
+        check_id: &str,
+        params: &serde_json::Value,
+    ) -> Result<EngineCheckResult, CheckError> {
         let p: Params = serde_json::from_value(params.clone())
             .map_err(|e| CheckError::invalid_params("file_exists", e))?;
 
@@ -58,7 +61,7 @@ impl CheckExecutor for FileExistsExecutor {
             Err(e) => return Err(CheckError::io(p.path.display().to_string(), e)),
         };
 
-        // verifica el tipo
+        // Verificar tipo
         if let Some(expected_type) = &p.file_type {
             let actual_type = if meta.is_file() {
                 FileType::File
@@ -67,7 +70,6 @@ impl CheckExecutor for FileExistsExecutor {
             } else {
                 FileType::Symlink
             };
-
             if *expected_type != actual_type {
                 return Ok(EngineCheckResult::fail(
                     check_id,
@@ -77,13 +79,13 @@ impl CheckExecutor for FileExistsExecutor {
                         "'{}' existe pero es {} (esperado {})",
                         p.path.display(),
                         file_type_str(&actual_type),
-                        file_type_str(expected_type)
+                        file_type_str(expected_type),
                     ),
                 ));
             }
         }
 
-        // Verificaciones Unix (owner, group y modo)
+        // Verificaciones Unix (owner, group, mode)
         #[cfg(unix)]
         {
             use std::os::unix::fs::MetadataExt;
@@ -91,17 +93,16 @@ impl CheckExecutor for FileExistsExecutor {
             if let Some(expected_owner) = &p.owner {
                 let uid = meta.uid();
                 let actual_owner = uid_to_name(uid).unwrap_or_else(|| uid.to_string());
-
                 if &actual_owner != expected_owner {
                     return Ok(EngineCheckResult::fail(
                         check_id,
                         &actual_owner,
                         expected_owner.as_str(),
                         format!(
-                            "'{}' propietario = '{}' (esperado {})",
+                            "'{}' propietario = '{}' (esperado '{}')",
                             p.path.display(),
                             actual_owner,
-                            expected_owner
+                            expected_owner,
                         ),
                     ));
                 }
@@ -119,7 +120,7 @@ impl CheckExecutor for FileExistsExecutor {
                             "'{}' grupo = '{}' (esperado '{}')",
                             p.path.display(),
                             actual_group,
-                            expected_group
+                            expected_group,
                         ),
                     ));
                 }
@@ -127,7 +128,6 @@ impl CheckExecutor for FileExistsExecutor {
 
             if let Some(expected_mode) = &p.mode {
                 let actual_mode = format!("{:04o}", meta.mode() & 0o7777);
-                // Normalizamos con sticky bit o suid: "600" → "0600" 
                 let expected_norm = normalize_mode(expected_mode);
                 if actual_mode != expected_norm {
                     return Ok(EngineCheckResult::fail(
@@ -138,7 +138,7 @@ impl CheckExecutor for FileExistsExecutor {
                             "'{}' permisos = {} (esperado {})",
                             p.path.display(),
                             actual_mode,
-                            expected_norm
+                            expected_norm,
                         ),
                     ));
                 }
@@ -156,33 +156,37 @@ impl CheckExecutor for FileExistsExecutor {
 
 fn file_type_str(t: &FileType) -> &'static str {
     match t {
-        FileType::File => "file",
-        FileType::Dir => "dir",
+        FileType::File    => "file",
+        FileType::Dir     => "dir",
         FileType::Symlink => "symlink",
     }
 }
 
 fn normalize_mode(mode: &str) -> String {
-    if mode.len() == 3 {
-        format!("0{mode}")
-    } else {
-        mode.to_string()
-    }
+    if mode.len() == 3 { format!("0{mode}") } else { mode.to_string() }
 }
 
 #[cfg(unix)]
 fn uid_to_name(uid: u32) -> Option<String> {
-    // Para siguientes verisones usar nix::unistd::User::from_uid, pero por no meter mas cosas lo
-    // hago leyendo /etc/passwd directamente y listo.
-    let passws = std::fs::read_to_string("/etc/passwd").ok()?;
-
+    let passwd = std::fs::read_to_string("/etc/passwd").ok()?;
     for line in passwd.lines() {
         let parts: Vec<&str> = line.split(':').collect();
         if parts.len() >= 3 && parts[2].parse::<u32>().ok()? == uid {
             return Some(parts[0].to_string());
         }
     }
+    None
+}
 
+#[cfg(unix)]
+fn gid_to_name(gid: u32) -> Option<String> {
+    let group = std::fs::read_to_string("/etc/group").ok()?;
+    for line in group.lines() {
+        let parts: Vec<&str> = line.split(':').collect();
+        if parts.len() >= 3 && parts[2].parse::<u32>().ok()? == gid {
+            return Some(parts[0].to_string());
+        }
+    }
     None
 }
 
@@ -191,41 +195,40 @@ mod tests {
     use super::*;
     use serde_json::json;
     use tempfile::tempdir;
- 
+
     #[tokio::test]
     async fn passes_for_existing_file() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.txt");
         tokio::fs::write(&path, b"content").await.unwrap();
- 
+
         let result = FileExistsExecutor
             .execute("chk-1", &json!({ "path": path, "file_type": "file" }))
             .await
             .unwrap();
- 
+
         assert!(result.passed);
     }
- 
+
     #[tokio::test]
     async fn fails_for_missing_file() {
         let result = FileExistsExecutor
-            .execute("chk-1", &json!({ "path": "/tmp/this_does_not_exist_complyx" }))
+            .execute("chk-1", &json!({ "path": "/tmp/complyx_test_no_existe_xyz" }))
             .await
             .unwrap();
- 
+
         assert!(!result.passed);
         assert!(result.detail.contains("no existe"));
     }
- 
+
     #[tokio::test]
     async fn fails_when_type_mismatch() {
         let dir = tempdir().unwrap();
- 
         let result = FileExistsExecutor
             .execute("chk-1", &json!({ "path": dir.path(), "file_type": "file" }))
             .await
             .unwrap();
- 
+
         assert!(!result.passed);
     }
 }
