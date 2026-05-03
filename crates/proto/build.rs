@@ -24,6 +24,8 @@
 //! * build_server(true), build_client(false)
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let build_client = cfg!(feature = "client");
+    let build_server = cfg!(feature = "server");
 //   let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 //    
 //    let proto_dir = manifest.join("../../proto");
@@ -85,15 +87,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ".",
         "#[derive(serde::Serialize, serde::Deserialize)]"
     );
+    prost_config.type_attribute(
+        ".",
+        "#[serde(default)]"
+        );
 
     tonic_build::configure()
-        .build_server(false)
-        .build_client(true)
+        .build_server(build_server)
+        .build_client(build_client)
         .compile_protos_with_config(
             prost_config,
             &[&proto_file],
             &[&proto_dir],
         )?;
+
+    println!("cargo:rerun-if-changed=proto/complyx.proto");
+    println!("cargo:rerun-if-changed=build.rs");
 
     Ok(())
 }

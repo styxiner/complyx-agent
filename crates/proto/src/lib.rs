@@ -40,3 +40,52 @@ pub use complyx::{
     SubmitResultsRequest,
     SubmitResultsResponse,
 };
+
+// Metodos de conveniencia sobre los tipos generados que se me olvidaron implementar cuando lo subi
+
+impl PolicyBundle {
+    pub fn total_checks(&self) -> usize {
+        self.policies
+            .iter()
+            .flat_map(|p| &p.elements)
+            .flat_map(|e| &e.checks)
+            .count()
+
+    }
+}
+
+impl PolicyRemediation {
+    // `true` si este mensaje tiene una remediacioon reeal configurada. En el proto3 los campos
+    // opcionales se inicializan a string vacio, asi que un `id` vacio significa "sin remediacion"
+    pub fn is_configured(&self) -> bool {
+        !self.id.is_empty()
+    }
+}
+
+impl CheckResult {
+    // Construye un CheckResult de error (passed = false)
+    pub fn execution_error(check_id: impl Into<String>, detail: impl Into<String>) -> Self {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        Self {
+            check_id: check_id.into(),
+            passed: false,
+            detail: detail.into(),
+            actual_value: String::new(),
+            expected_value: String::new(),
+            executed_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as i64,
+
+        }
+    }
+
+    // Construye un CheckResult para tipo de check no soportado
+    pub fn unsupported_type(check_id: impl Into<String>, check_type: &str) -> Self {
+        Self::execution_error(
+            check_id,
+            format!("tipo de check '{}' no soportado", check_type),
+            )
+    }
+}

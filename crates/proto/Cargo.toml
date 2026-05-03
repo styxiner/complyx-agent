@@ -5,6 +5,16 @@ edition = "2024"
 
 build = "build.rs"
 
+# Features:
+# client: Genera los stubs de cliente gRPC (grpc-client del agente)
+# server: genera los traits de servidor gRPC (grpc-service del servidor)
+#
+# Sin ninguna feature activa solo se generan los structs de los mensajes.
+[features]
+default = []
+client = []
+server = []
+
 [dependencies]
 #prost = { version = "0.13", features = ["derive"] }
 prost = "0.13"
@@ -13,4 +23,4 @@ tonic = { version = "0.12", features = ["tls"] }
 
 [build-dependencies]
 prost-build = "0.13"
-tonic-build = "0.12.3"
+tonic-build = {version = "0.12.3", features = ["prost"]}

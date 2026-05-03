@@ -1,8 +1,44 @@
 //! Cliente gRPC del agente complyx:
 //! Registro inicial, polling de politicas y envio de resultados.
+//!
+//! ## como usar
+//!
+//! ```ignore
+//! use grpc_client::{GrpcClient, GrpcClientConfig, enroll::EnrollRequest};
+//!
+//! #[tokio::main]
+//! async fn main() -> anyhow::Result<()> {
+//!     // Primera vez: enrolamiento
+//!     let enroll_req = EnrollRequest {
+//!         token: "a3f8c2d1...".into(),
+//!         csr_pem: "-----BEGIN CERTIFICATE REQUEST-----...".into(),
+//!         hostname: "web-01.acme.com".into(),
+//!         os_name: "Linux".into(),
+//!         os_version: "6.8.0".into(),
+//!     };
+//!     let enroll_resp = grpc_client::enroll::enroll("https://server:9001", enroll_req).await?;
+//!
+//!     // Uso normal: poll + submit
+//!     let config = GrpcClientConfig {
+//!         server_url: "https://server:9000".into(),
+//!         cert_dir: "/var/lib/complyx/certs".into(),
+//!         agent_id: "550e8400-...".into(),
+//!     };
+//!     let client = GrpcClient::connect(config).await?;
+//!
+//!     let response = client.poll_policies("current-hash").await?;
+//!     if response.policies_changed {
+//!         // ejecutar checks con policy-engine...
+//!         client.submit_results(vec![]).await?;
+//!     }
+//!
+//!     Ok(())
+//! }
+//! ```
+
 
 mod client;
-mod mtls;
+pub mod mtls;
 mod retry;
 pub mod enroll;
 

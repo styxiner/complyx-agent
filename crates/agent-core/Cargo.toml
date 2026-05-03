@@ -3,4 +3,33 @@ name = "agent-core"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "complyx-agent"
+path = "src/main.rs"
+
 [dependencies]
+proto = {path = "../proto", features = ["client"]}
+grpc-client = {path = "../grpc-client"}
+policy-engine = {path = "../policy-engine"}
+remediation-engine = {path = "../remediation-engine"}
+local-db = {path = "../local-db"}
+
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "time", "fs"]}
+
+figment = {version = "0.10", features = ["toml", "env"]}
+serde = {version = "1", features = ["derive"]}
+
+#tracing = "0.1"
+#tracing-suscriber = {version = "0.3", features = ["env-filter", "json", "fmt"]}
+
+tracing = "0.1"
+tracing-subscriber = {version = "0.3", features = ["env-filter", "json", "fmt"]}
+
+anyhow = "1"
+thiserror = "1"
+
+uuid = {version = "1", features = ["v4"]}
+
+[dev-dependencies]
+tokio = {version = "1", features = ["macros", "rt-multi-thread"]}
+tempfile = "3"
