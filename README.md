@@ -21,7 +21,7 @@ Genera las migraciones para la base de datos:
 
 ```bash
 sqlx database create --database-url sqlite:./complyx-agent.db
-sqlx migrate run --database-url sqlite:./complyx-agent.db --source crates/local-db/migrations
+sqlx migrate run --database-url sqlite:./complyx-agent.db --source crates/local-db/src/migrations
 DATABASE_URL="sqlite:./complyx-agent.db" cargo sqlx prepare --workspace
 ```
 

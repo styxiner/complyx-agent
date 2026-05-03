@@ -4,3 +4,18 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+proto = {path = "../proto"}
+local-db = {path = "../local-db"}
+
+tokio = {version = "1", features = ["fs", "process", "io-util"]}
+async-trait = "0.1"
+
+serde = {version = "1", features = ["derive"]}
+serde_json = "1"
+
+thiserror = "1"
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = {version = "1", features = ["macros", "rt-multi-thread"]}
+tempfile = "3"
