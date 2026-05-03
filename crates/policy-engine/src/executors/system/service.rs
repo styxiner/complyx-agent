@@ -29,27 +29,27 @@ pub struct ServiceExecutor;
 
 #[derive(Deserialize)]
 struct Params {
-    /// Nombre del servicio (ej. `sshd`, `nginx`, `auditd`).
-    /// Sin el sufijo `.service` — se añade automáticamente si hace falta.
+    // Nombre del servicio (ej. `sshd`, `nginx`, `auditd`).
+    // Sin el sufijo `.service` — se añade automáticamente si hace falta.
     name: String,
 
-    /// Si se especifica, verifica que el servicio esté activo (`true`) o inactivo (`false`).
+    // Si se especifica, verifica que el servicio esté activo (`true`) o inactivo (`false`).
     #[serde(default)]
     active: Option<bool>,
 
-    /// Si se especifica, verifica que el servicio esté habilitado (`true`) o deshabilitado (`false`).
+    // Si se especifica, verifica que el servicio esté habilitado (`true`) o deshabilitado (`false`).
     #[serde(default)]
     enabled: Option<bool>,
 }
 
-/// Estado de un servicio tal como lo reporta systemd.
+// Estado de un servicio tal como lo reporta systemd.
 #[derive(Debug, PartialEq)]
 struct ServiceState {
-    /// `true` si el servicio está actualmente corriendo.
+    // `true` si el servicio está actualmente corriendo.
     is_active: bool,
-    /// `true` si el servicio arranca automáticamente con el sistema.
+    // `true` si el servicio arranca automáticamente con el sistema.
     is_enabled: bool,
-    /// Estado en texto libre (ej. "active (running)", "inactive (dead)").
+    // Estado en texto libre (ej. "active (running)", "inactive (dead)").
     active_state: String,
 }
 
@@ -128,7 +128,7 @@ impl CheckExecutor for ServiceExecutor {
     }
 }
 
-/// Añade `.service` si el nombre no tiene unidad explícita.
+// Añade `.service` si el nombre no tiene unidad explícita.
 fn normalize_service_name(name: &str) -> String {
     if name.contains('.') {
         name.to_string()
@@ -137,9 +137,9 @@ fn normalize_service_name(name: &str) -> String {
     }
 }
 
-/// Consulta el estado del servicio.
-/// Usa `systemctl show` con campos específicos para obtener datos estructurados
-/// en lugar de parsear la salida legible de `systemctl status`.
+// Consulta el estado del servicio.
+// Usa `systemctl show` con campos específicos para obtener datos estructurados
+// en lugar de parsear la salida legible de `systemctl status`.
 async fn query_service_state(service_name: &str) -> Result<ServiceState, String> {
     let output = tokio::process::Command::new("systemctl")
         .args(["show", "--no-pager", "--property=ActiveState,UnitFileState", service_name])
@@ -153,13 +153,13 @@ async fn query_service_state(service_name: &str) -> Result<ServiceState, String>
     parse_systemctl_show(&stdout, service_name)
 }
 
-/// Parsea la salida de `systemctl show --property=ActiveState,UnitFileState`.
-///
-/// Formato:
-/// ```
-/// ActiveState=active
-/// UnitFileState=enabled
-/// ```
+// Parsea la salida de `systemctl show --property=ActiveState,UnitFileState`.
+//
+// Formato:
+// ```
+// ActiveState=active
+// UnitFileState=enabled
+// ```
 fn parse_systemctl_show(output: &str, service_name: &str) -> Result<ServiceState, String> {
     let mut active_state = String::from("unknown");
     let mut unit_file_state = String::from("unknown");

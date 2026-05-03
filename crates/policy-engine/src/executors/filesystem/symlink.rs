@@ -50,7 +50,7 @@ impl CheckExecutor for SymlinkExecutor {
                 check_id,
                 "no es symlink",
                 "symlink",
-                format!("'{}' existe pero no es un symlink (es {})", p.path.display(), if meta.is_file() { 
+                format!("'{}' existe pero no es symlink (es {})", p.path.display(), if meta.is_file() { 
                     "fichero" 
                 } else { 
                     "directorio" 
