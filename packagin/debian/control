@@ -1,0 +1,19 @@
+Package: complyx-agent
+Version: 0.1.0
+Section: admin
+Priority: optional
+Architecture: amd64
+Depends: systemd
+Installed-Size: 15000
+Maintainer: Styxiner
+Homepage: https://github.com/styxiner/complyx-agent
+Description: Complyx Security and Compliance Agent
+ Agente de gestión de cumplimiento normativo para endpoints Linux.
+ Ejecuta checks de seguridad definidos en políticas, envía los resultados
+ al servidor central Complyx y aplica remediaciones automáticas cuando
+ está configurado para ello.
+ .
+ El agente se comunica con el servidor mediante gRPC con mTLS y almacena
+ los resultados en una base de datos SQLite local para garantizar que no
+ se pierden aunque el servidor no esté disponible temporalmente.
+

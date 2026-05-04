@@ -1,0 +1,22 @@
+#!/bin/bash
+# prerm — se ejecuta antes de eliminar el paquete .deb
+set -e
+
+case "$1" in
+    remove|purge|deconfigure)
+        if [ -d /run/systemd/system ]; then
+            systemctl stop complyx-agent.service || true
+            systemctl disable complyx-agent.service || true
+        fi
+        ;;
+    upgrade|failed-upgrade)
+        # En upgrade: systemd restart lo gestiona el postinst del nuevo paquete
+        ;;
+    *)
+        echo "prerm llamado con argumento desconocido: $1" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
+

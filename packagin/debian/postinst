@@ -1,0 +1,69 @@
+#!/bin/bash
+# postinst — se ejecuta después de instalar el paquete .deb
+set -e
+
+AGENT_USER="complyx"
+AGENT_GROUP="complyx"
+DATA_DIR="/var/lib/complyx"
+CERTS_DIR="/var/lib/complyx/certs"
+CONFIG_DIR="/etc/complyx"
+
+case "$1" in
+    configure)
+        # Crear grupo si no existe
+        if ! getent group "$AGENT_GROUP" > /dev/null 2>&1; then
+            groupadd --system "$AGENT_GROUP"
+        fi
+
+        # Crear usuario del sistema si no existe
+        # --system: UID < 1000, sin home interactivo, sin shell de login
+        if ! getent passwd "$AGENT_USER" > /dev/null 2>&1; then
+            useradd \
+                --system \
+                --gid "$AGENT_GROUP" \
+                --home-dir "$DATA_DIR" \
+                --no-create-home \
+                --shell /sbin/nologin \
+                --comment "Complyx Security Agent" \
+                "$AGENT_USER"
+        fi
+
+        # Crear directorios con permisos correctos
+        install -d -m 0755 -o "$AGENT_USER" -g "$AGENT_GROUP" "$DATA_DIR"
+        install -d -m 0700 -o "$AGENT_USER" -g "$AGENT_GROUP" "$CERTS_DIR"
+        install -d -m 0755 -o root -g root "$CONFIG_DIR"
+
+        # Proteger la configuración: solo root puede modificarla,
+        # el agente puede leerla
+        if [ -f "$CONFIG_DIR/agent.toml" ]; then
+            chown root:root "$CONFIG_DIR/agent.toml"
+            chmod 0644 "$CONFIG_DIR/agent.toml"
+        fi
+
+        # Habilitar e iniciar el servicio
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload || true
+            systemctl enable complyx-agent.service || true
+            # No arrancamos automáticamente: el admin debe configurar server_url primero
+            echo ""
+            echo "=== Complyx Agent instalado ==="
+            echo ""
+            echo "Antes de arrancar el agente, configura el servidor en:"
+            echo "  /etc/complyx/agent.toml"
+            echo ""
+            echo "Luego enrola el agente:"
+            echo "  COMPLYX_ENROLL_TOKEN=<token> systemctl start complyx-agent"
+            echo ""
+        fi
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        echo "postinst llamado con argumento desconocido: $1" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
+
