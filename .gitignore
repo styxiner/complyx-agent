@@ -19,3 +19,5 @@ rustc-ice-*.txt
 .sqlx/
 
 *.db
+
+packagin/build
