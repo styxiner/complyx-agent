@@ -11,6 +11,19 @@
 //! 7. Inicializar policy-engine y remediation-engine.
 //! 8. Arrancar el scheduler con gestión de señales SIGTERM/SIGINT.
 
+//! Punto de entrada del agente Complyx.
+//!
+//! Secuencia de arranque:
+//!
+//! 1. Cargar y validar configuración.
+//! 2. Inicializar telemetría (tracing).
+//! 3. Conectar a la BD local SQLite (crea el fichero si no existe).
+//! 4. Recuperar resultados `sending` que quedaron a medias en el arranque anterior.
+//! 5. Si el agente no está enrolado → ejecutar flujo de enrolamiento.
+//! 6. Conectar el cliente gRPC (lazy — no falla si el servidor no está disponible).
+//! 7. Inicializar policy-engine y remediation-engine.
+//! 8. Arrancar el scheduler con gestión de señales SIGTERM/SIGINT.
+
 mod config;
 mod poll_loop;
 mod scheduler;
@@ -30,26 +43,41 @@ use config::AgentConfig;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let config = config::load(None)?; // Cargar la configuracion del agente.
+    // -----------------------------------------------------------------------
+    // 1. Configuración
+    // -----------------------------------------------------------------------
+    let config = config::load(None)?;
     config.validate()?;
 
-    init_tracing(&config); // Iniciar la telemetria
+    // -----------------------------------------------------------------------
+    // 2. Telemetría (antes de cualquier log)
+    // -----------------------------------------------------------------------
+    init_tracing(&config);
 
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
         agent_id = %config.agent_id,
         server_url = %config.server_url,
         "complyx-agent arrancando"
-);
+    );
 
-    let db = LocalDb::connect(&config.db_path) // Config bbdd local sqlite
-        .await
-        .map_err(|e| anyhow::anyhow!("no se pudo abrir la BD local en {:?}: {}", config.db_path, e))?;
+    // -----------------------------------------------------------------------
+    // 3. Base de datos local
+    // -----------------------------------------------------------------------
+    let db = LocalDb::connect(&config.db_path).await.map_err(|e| {
+        anyhow::anyhow!(
+            "no se pudo abrir la BD local en {:?}: {}",
+            config.db_path,
+            e
+        )
+    })?;
 
     tracing::info!(db_path = ?config.db_path, "BD local inicializada");
 
-    let recovered = db.reset_sending_to_pending().await?; // Pillar los eventos interrumpidos en el
-                                                          // arranque anterior
+    // -----------------------------------------------------------------------
+    // 4. Recuperar resultados interrupted en el arranque anterior
+    // -----------------------------------------------------------------------
+    let recovered = db.reset_sending_to_pending().await?;
     if recovered > 0 {
         tracing::warn!(
             count = recovered,
@@ -77,7 +105,10 @@ async fn main() -> anyhow::Result<()> {
 
     let config = Arc::new(config);
 
-    if !config.is_enrolled() { // Registrar contra el servidor si no lo está 
+    // -----------------------------------------------------------------------
+    // 5. Enrolamiento (si no está enrolado)
+    // -----------------------------------------------------------------------
+    if !config.is_enrolled() {
         tracing::info!("agente no enrolado, iniciando flujo de enrolamiento");
         run_enrollment(&config).await?;
         tracing::info!("enrolamiento completado");
@@ -88,7 +119,10 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    let client = GrpcClient::connect(GrpcClientConfig { // Inicializar cliente gRPC
+    // -----------------------------------------------------------------------
+    // 6. Cliente gRPC
+    // -----------------------------------------------------------------------
+    let client = GrpcClient::connect(GrpcClientConfig {
         server_url: config.server_url.clone(),
         cert_dir: config.cert_dir.clone(),
         agent_id: config.agent_id.clone(),
@@ -98,8 +132,9 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!(server_url = %config.server_url, "cliente gRPC inicializado");
 
-
-    // Inicializar los motores
+    // -----------------------------------------------------------------------
+    // 7. Engines
+    // -----------------------------------------------------------------------
     let engine = PolicyEngine::new();
     tracing::info!(
         types = ?engine.supported_check_types(),
@@ -118,13 +153,10 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!(pending, "resultados pendientes de envío en la cola local");
     }
 
-    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false); // Crea un canal watch
-                                                                         // para gestionar la señal
-                                                                         // de apagado
-                                                                         // (inicializado en false)
-                                                                         // para el mecanismo de
-                                                                         // apagado asíncrono (tx
-                                                                         // envia la señal)
+    // -----------------------------------------------------------------------
+    // 8. Señales de parada + scheduler
+    // -----------------------------------------------------------------------
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
 
     // Capturar SIGTERM y SIGINT para shutdown graceful
     let shutdown_tx_clone = shutdown_tx.clone();
@@ -150,20 +182,22 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-// Ejecuta el flujo de enrolamiento completo.
-//
-// Lee el token del campo `enroll_token` de la configuración o de la variable
-// de entorno `COMPLYX_ENROLL_TOKEN`.
+/// Ejecuta el flujo de enrolamiento completo.
+///
+/// Lee el token del campo `enroll_token` de la configuración o de la variable
+/// de entorno `COMPLYX_ENROLL_TOKEN`.
 async fn run_enrollment(config: &AgentConfig) -> anyhow::Result<()> {
     let token = config
         .enroll_token
         .clone()
         .or_else(|| std::env::var("COMPLYX_ENROLL_TOKEN").ok())
-        .ok_or_else(|| anyhow::anyhow!(
-            "el agente no está enrolado y no se encontró COMPLYX_ENROLL_TOKEN. \
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "el agente no está enrolado y no se encontró COMPLYX_ENROLL_TOKEN. \
              Genera un token con 'complyx-server enroll-token' y ejecútalo como: \
              COMPLYX_ENROLL_TOKEN=<token> complyx-agent"
-        ))?;
+            )
+        })?;
 
     let hostname = std::fs::read_to_string("/etc/hostname")
         .map(|h| h.trim().to_string())
@@ -174,9 +208,33 @@ async fn run_enrollment(config: &AgentConfig) -> anyhow::Result<()> {
 
     tracing::info!(hostname = %hostname, os_name = %os_name, "iniciando enrolamiento");
 
-    let req = EnrollRequest {token, hostname, os_name, os_version,};
+    let req = EnrollRequest {
+        token,
+        hostname,
+        os_name,
+        os_version,
+    };
 
-    let result = enroll::enroll(&config.enroll_url, req)
+    // Leer el ca.crt si ya existe en el cert_dir (pre-provisioning).
+    // Si no existe todavía, pasamos None y se usarán las CAs del sistema.
+    let ca_cert_pem = {
+        let ca_path = config.cert_dir.join("ca.crt");
+        match tokio::fs::read_to_string(&ca_path).await {
+            Ok(pem) => {
+                tracing::info!(path = %ca_path.display(), "usando ca.crt pre-provisionado para el enrolamiento");
+                Some(pem)
+            }
+            Err(_) => {
+                tracing::warn!(
+                    "ca.crt no encontrado en {:?}, usando CAs del sistema para verificar el servidor",
+                    config.cert_dir
+                );
+                None
+            }
+        }
+    };
+
+    let result = enroll::enroll(&config.enroll_url, req, ca_cert_pem.as_deref())
         .await
         .map_err(|e| anyhow::anyhow!("enrolamiento fallido: {}", e))?;
 
@@ -189,10 +247,10 @@ async fn run_enrollment(config: &AgentConfig) -> anyhow::Result<()> {
     Ok(())
 }
 
-// Inicializa el sistema de logging estructurado.
+/// Inicializa el sistema de logging estructurado.
 fn init_tracing(config: &AgentConfig) {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(&config.log_level));
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level));
 
     match config.log_format {
         config::LogFormat::Json => {
@@ -212,7 +270,7 @@ fn init_tracing(config: &AgentConfig) {
     }
 }
 
-// Lee la versión del sistema operativo de `/etc/os-release`.
+/// Lee la versión del sistema operativo de `/etc/os-release`.
 fn read_os_version() -> String {
     std::fs::read_to_string("/etc/os-release")
         .unwrap_or_default()
@@ -223,17 +281,15 @@ fn read_os_version() -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-// Espera SIGTERM o SIGINT (Ctrl+C).
+/// Espera SIGTERM o SIGINT (Ctrl+C).
 async fn wait_for_shutdown_signal() {
     use tokio::signal;
 
     #[cfg(unix)]
     {
-        use signal::unix::{signal, SignalKind};
-        let mut sigterm = signal(SignalKind::terminate())
-            .expect("no se pudo registrar SIGTERM");
-        let mut sigint = signal(SignalKind::interrupt())
-            .expect("no se pudo registrar SIGINT");
+        use signal::unix::{SignalKind, signal};
+        let mut sigterm = signal(SignalKind::terminate()).expect("no se pudo registrar SIGTERM");
+        let mut sigint = signal(SignalKind::interrupt()).expect("no se pudo registrar SIGINT");
 
         tokio::select! {
             _ = sigterm.recv() => tracing::debug!("SIGTERM recibido"),
@@ -243,8 +299,6 @@ async fn wait_for_shutdown_signal() {
 
     #[cfg(not(unix))]
     {
-        signal::ctrl_c()
-            .await
-            .expect("no se pudo registrar Ctrl+C");
+        signal::ctrl_c().await.expect("no se pudo registrar Ctrl+C");
     }
 }

@@ -1,6 +1,9 @@
 # Complyx Agent
 
-Agente de gestión de cumplimiento normativo para endpoints Linux. Ejecuta checks de seguridad definidos en políticas, envía los resultados al servidor central y aplica remediaciones automáticas cuando está configurado.
+Agente de gestión de cumplimiento normativo para endpoints Linux.
+Ejecuta checks de seguridad definidos en políticas,
+envía los resultados al servidor central y
+aplica remediaciones automáticas cuando está configurado.
 
 ## Índice
 
@@ -52,7 +55,8 @@ git clone https://github.com/styxiner/complyx-agent.git
 cd complyx-agent
 ```
 
-Prepara la base de datos local (necesario para que `sqlx` verifique las queries en compilación):
+Prepara la base de datos local
+(necesario para que `sqlx` verifique las queries en compilación):
 
 ```bash
 sqlx database create --database-url sqlite:./complyx-agent.db
@@ -74,7 +78,8 @@ El binario queda en `target/debug/complyx-agent`.
 
 ## Compilación para producción
 
-Para producción se usa el target `musl` que genera un **binario estático** sin dependencias de glibc, compatible con cualquier distribución Linux:
+Para producción se usa el target `musl` que genera un **binario estático**
+sin dependencias de glibc, compatible con cualquier distribución Linux:
 
 ```bash
 # Añadir el target musl si no está instalado
@@ -108,7 +113,8 @@ upx --best --lzma target/x86_64-unknown-linux-musl/dist/complyx-agent
 
 ## Empaquetado
 
-El script `packaging/build-packages.sh` compila el binario y genera los tres formatos de paquete en un solo paso:
+El script `packaging/build-packages.sh` compila el binario
+y genera los tres formatos de paquete en un solo paso:
 
 ```bash
 cd packaging
@@ -133,7 +139,8 @@ Para compilar solo para una distribución concreta:
 ./build-packages.sh --version 0.1.0   # genera los tres formatos
 ```
 
-El script detecta automáticamente qué herramientas están disponibles (`dpkg-deb`, `rpmbuild`) y genera solo los paquetes que puede construir.
+El script detecta automáticamente qué herramientas están disponibles
+(`dpkg-deb`, `rpmbuild`) y genera solo los paquetes que puede construir.
 
 ---
 
@@ -160,13 +167,17 @@ cd packaging/build/arch
 makepkg -si
 ```
 
-Todos los paquetes crean automáticamente el usuario y grupo `complyx`, los directorios necesarios y registran el servicio systemd. **El servicio no arranca automáticamente** tras la instalación — es necesario configurar el servidor y registrar el agente primero.
+Todos los paquetes crean automáticamente el usuario y grupo `complyx`,
+los directorios necesarios y registran el servicio systemd.
+**El servicio no arranca automáticamente** tras la instalación —
+es necesario configurar el servidor y registrar el agente primero.
 
 ---
 
 ## Registro
 
-El registro es el proceso por el que el agente obtiene su certificado de cliente para autenticarse con el servidor mediante mTLS. Ocurre una única vez.
+El registro es el proceso por el que el agente obtiene su certificado de cliente
+para autenticarse con el servidor mediante mTLS. Ocurre una única vez.
 
 **1. Genera un token de registro en el servidor:**
 
@@ -191,7 +202,10 @@ enroll_url = "https://tu-servidor-complyx:9001"
 COMPLYX_ENROLL_TOKEN=a3f8c2d1e9b04f7a... systemctl start complyx-agent
 ```
 
-El agente genera un par de claves Ed25519, envía el CSR al servidor, recibe su certificado firmado por la CA interna y lo guarda en `/var/lib/complyx/certs/`. A partir de este momento el token queda invalidado y el agente arranca directamente sin necesitar token.
+El agente genera un par de claves Ed25519, envía el CSR al servidor,
+recibe su certificado firmado por la CA interna y lo guarda en `/var/lib/complyx/certs/`.
+A partir de este momento el token queda invalidado y
+el agente arranca directamente sin necesitar token.
 
 **4. Verifica el registro:**
 
@@ -212,7 +226,9 @@ complyx-agent[1234]: ejecutando poll inicial...
 
 ## Configuración
 
-El fichero de configuración principal es `/etc/complyx/agent.toml`. Cualquier valor puede sobreescribirse con una variable de entorno con el prefijo `COMPLYX_`:
+El fichero de configuración principal es `/etc/complyx/agent.toml`.
+Cualquier valor puede sobreescribirse con una variable de entorno
+con el prefijo `COMPLYX_`:
 
 ```toml
 # /etc/complyx/agent.toml
@@ -243,14 +259,14 @@ log_format = "json"      # json (producción) | pretty (desarrollo)
 
 Todas las claves del TOML son accesibles como variables de entorno. Ejemplos:
 
-| Variable | Equivalente en TOML |
-|---|---|
-| `COMPLYX_SERVER_URL` | `server_url` |
-| `COMPLYX_ENROLL_URL` | `enroll_url` |
-| `COMPLYX_ENROLL_TOKEN` | `enroll_token` (solo para el primer arranque) |
-| `COMPLYX_LOG_LEVEL` | `log_level` |
-| `COMPLYX_AUTO_REMEDIATE` | `auto_remediate` |
-| `COMPLYX_CONFIG_PATH` | Ruta al fichero de configuración (defecto: `/etc/complyx/agent.toml`) |
+|Variable|Equivalente en TOML|
+|--------|-------------------|
+|`COMPLYX_SERVER_URL`|`server_url`|
+|`COMPLYX_ENROLL_URL`|`enroll_url`|
+|`COMPLYX_ENROLL_TOKEN`|`enroll_token` (solo para el primer arranque)|
+|`COMPLYX_LOG_LEVEL`|`log_level`|
+|`COMPLYX_AUTO_REMEDIATE`|`auto_remediate`|
+|`COMPLYX_CONFIG_PATH`|Ruta al fichero de configuración (defecto: `/etc/complyx/agent.toml`)|
 
 Las variables de entorno tienen **mayor precedencia** que el fichero TOML.
 
@@ -279,18 +295,19 @@ systemctl restart complyx-agent
 
 ### Directorios relevantes
 
-| Ruta | Contenido |
-|---|---|
-| `/etc/complyx/agent.toml` | Configuración del agente |
-| `/var/lib/complyx/certs/agent.crt` | Certificado del agente |
-| `/var/lib/complyx/certs/agent.key` | Clave privada (permisos 0600) |
-| `/var/lib/complyx/certs/ca.crt` | Certificado raíz de la CA del servidor |
-| `/var/lib/complyx/agent.db` | Base de datos SQLite local |
-| `/etc/sysctl.d/99-complyx.conf` | Parámetros de kernel aplicados por remediaciones |
+|Ruta|Contenido|
+|------|-------|
+|`/etc/complyx/agent.toml`|Configuración del agente|
+|`/var/lib/complyx/certs/agent.crt`|Certificado del agente|
+|`/var/lib/complyx/certs/agent.key`|Clave privada (permisos 0600)|
+|`/var/lib/complyx/certs/ca.crt`|Certificado raíz de la CA del servidor|
+|`/var/lib/complyx/agent.db`|Base de datos SQLite local|
+|`/etc/sysctl.d/99-complyx.conf`|Parámetros de kernel aplicados por remediaciones|
 
 ### Re-registro
 
-Si los certificados se corrompen o el servidor los revoca, puedes re-registrar el agente:
+Si los certificados se corrompen o el servidor los revoca,
+puedes re-registrar el agente:
 
 ```bash
 # Eliminar los certificados actuales

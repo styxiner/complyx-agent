@@ -63,10 +63,10 @@ pub async fn enqueue(pool: &SqlitePool, results: &[CheckResult]) -> Result<(), L
             Ok(j) => j,
             Err(e) => {
                 tracing::warn!(
-                    check_id = %check_id,
-                    error = %e,
-                    "no se pudo serializar CheckResult, omitiendo"
-                    );
+                check_id = %check_id,
+                error = %e,
+                "no se pudo serializar CheckResult, omitiendo"
+                );
 
                 continue;
             }
@@ -81,21 +81,21 @@ pub async fn enqueue(pool: &SqlitePool, results: &[CheckResult]) -> Result<(), L
             check_id,
             data_json,
             now,
-            )
-            .execute(&mut *tx)
-            .await
-            .map_err(LocalDbError::Database)?;
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(LocalDbError::Database)?;
 
         inserted += 1;
     }
 
     tx.commit().await.map_err(LocalDbError::Database)?;
-    
+
     tracing::debug!(
         inserted,
         total = results.len(),
         "resultados añadidos a la cola para envio al servidor"
-        );
+    );
 
     Ok(())
 }
@@ -124,10 +124,10 @@ pub async fn drain_pending(pool: &SqlitePool, limit: i64) -> Result<Vec<QueueRow
         "#,
         MAX_RETRIES,
         limit
-        )
-        .fetch_all(pool)
-        .await
-        .map_err(LocalDbError::Database)?;
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(LocalDbError::Database)?;
 
     if rows.is_empty() {
         return Ok(rows);
@@ -138,7 +138,7 @@ pub async fn drain_pending(pool: &SqlitePool, limit: i64) -> Result<Vec<QueueRow
     let ids: Vec<&str> = rows.iter().map(|r| r.id.as_str()).collect();
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
     let query = format!("UPDATE result_queue SET status = 'sending' WHERE id IN ({placeholders})");
-    
+
     let mut q = sqlx::query(&query);
     for id in &ids {
         q = q.bind(*id);
@@ -155,7 +155,10 @@ pub async fn drain_pending(pool: &SqlitePool, limit: i64) -> Result<Vec<QueueRow
 // Las filas que no se pueden deserializar se marcan como `failed` directamente (estan corruptas y
 // no tiene sentido enviarlas)
 
-pub async fn deserialize_rows(pool: &SqlitePool, rows: Vec<QueueRow>) -> Result<(Vec<CheckResult>, Vec<String>), LocalDbError> {
+pub async fn deserialize_rows(
+    pool: &SqlitePool,
+    rows: Vec<QueueRow>,
+) -> Result<(Vec<CheckResult>, Vec<String>), LocalDbError> {
     let mut results = Vec::with_capacity(rows.len());
     let mut failed_ids = Vec::new();
 
@@ -164,12 +167,12 @@ pub async fn deserialize_rows(pool: &SqlitePool, rows: Vec<QueueRow>) -> Result<
             Ok(r) => results.push(r),
             Err(e) => {
                 tracing::warn!(
-                    id = %row.id,
-                    check_id = %row.check_id,
-                    error = %e,
-                    "resultado corrupto en cola, marcando como fallido"
-                    );
-                
+                id = %row.id,
+                check_id = %row.check_id,
+                error = %e,
+                "resultado corrupto en cola, marcando como fallido"
+                );
+
                 failed_ids.push(row.id.clone());
                 mark_failed(pool, &[row.id], "JSON corrupto en la cola local").await?;
             }
@@ -190,7 +193,9 @@ pub async fn mark_sent(pool: &SqlitePool, ids: &[String]) -> Result<(), LocalDbE
 
     let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
-    let query = format!("UPDATE result_queue SET status = 'sent', sent_at = ? WHERE id IN ({placeholders})");
+    let query = format!(
+        "UPDATE result_queue SET status = 'sent', sent_at = ? WHERE id IN ({placeholders})"
+    );
 
     let mut q = sqlx::query(&query).bind(&now);
     for id in ids {
@@ -199,10 +204,7 @@ pub async fn mark_sent(pool: &SqlitePool, ids: &[String]) -> Result<(), LocalDbE
 
     q.execute(pool).await.map_err(LocalDbError::Database)?;
 
-    tracing::debug!(
-        count = ids.len(),
-        "resultados marcados como enviados"
-        );
+    tracing::debug!(count = ids.len(), "resultados marcados como enviados");
 
     Ok(())
 }
@@ -213,7 +215,11 @@ pub async fn mark_sent(pool: &SqlitePool, ids: &[String]) -> Result<(), LocalDbE
 // (mientras `retries < MAX_RETRIES`). Si el servidor los rechazo permanentemente, quedaran en
 // `failed` definitivamente
 
-pub async fn mark_failed(pool: &SqlitePool, ids: &[String], reason: &str) -> Result<(), LocalDbError> {
+pub async fn mark_failed(
+    pool: &SqlitePool,
+    ids: &[String],
+    reason: &str,
+) -> Result<(), LocalDbError> {
     if ids.is_empty() {
         return Ok(());
     }
@@ -225,7 +231,7 @@ pub async fn mark_failed(pool: &SqlitePool, ids: &[String], reason: &str) -> Res
         SET status = 'failed', retries = retries + 1, error_detail = ?
         WHERE id IN ({placeholders})
         "#
-        );
+    );
 
     let mut q = sqlx::query(&query).bind(reason);
     for id in ids {
@@ -238,7 +244,7 @@ pub async fn mark_failed(pool: &SqlitePool, ids: &[String], reason: &str) -> Res
         count = ids.len(),
         reason,
         "resultados marcados como fallidos"
-        );
+    );
 
     Ok(())
 }
@@ -250,17 +256,18 @@ pub async fn mark_failed(pool: &SqlitePool, ids: &[String], reason: &str) -> Res
 // bloqueados para siempre.
 
 pub async fn reset_sending_to_pending(pool: &SqlitePool) -> Result<u64, LocalDbError> {
-    let result = sqlx::query!("UPDATE result_queue SET status = 'pending' WHERE status = 'sending'")
-        .execute(pool)
-        .await
-        .map_err(LocalDbError::Database)?;
+    let result =
+        sqlx::query!("UPDATE result_queue SET status = 'pending' WHERE status = 'sending'")
+            .execute(pool)
+            .await
+            .map_err(LocalDbError::Database)?;
 
     let recovered = result.rows_affected();
     if recovered > 0 {
         tracing::warn!(
             count = recovered,
             "resultados en estado 'sending' recuperados a 'pending' tras reinicio"
-            );
+        );
     }
 
     Ok(recovered)
@@ -273,10 +280,10 @@ pub async fn pending_count(pool: &SqlitePool) -> Result<i64, LocalDbError> {
     let count = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM result_queue WHERE status = 'pending' AND retries < ?",
         MAX_RETRIES
-        )
-        .fetch_one(pool)
-        .await
-        .map_err(LocalDbError::Database)?;
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(LocalDbError::Database)?;
 
     Ok(count)
 }
@@ -293,10 +300,10 @@ pub async fn purge_old_sent(pool: &SqlitePool, days: i64) -> Result<u64, LocalDb
         WHERE status = 'sent' AND sent_at < datetime('now', '-' || ? || ' days')
         "#,
         days
-        )
-        .execute(pool)
-        .await
-        .map_err(LocalDbError::Database)?;
+    )
+    .execute(pool)
+    .await
+    .map_err(LocalDbError::Database)?;
 
     let purged = result.rows_affected();
     if purged > 0 {
@@ -304,20 +311,18 @@ pub async fn purge_old_sent(pool: &SqlitePool, days: i64) -> Result<u64, LocalDb
             purged,
             days,
             "resultados enviados antiguos eliminados de la cola"
-            );
+        );
     }
 
     Ok(purged)
 }
-
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::connect_test;
     use proto::CheckResult;
- 
+
     fn make_result(check_id: &str, passed: bool) -> CheckResult {
         CheckResult {
             check_id: check_id.to_string(),
@@ -328,119 +333,140 @@ mod tests {
             expected_value: ">= 15".into(),
         }
     }
- 
+
     #[tokio::test]
     async fn enqueue_and_drain() {
         let pool = connect_test().await;
- 
-        let results = vec![
-            make_result("chk-1", true),
-            make_result("chk-2", false),
-        ];
+
+        let results = vec![make_result("chk-1", true), make_result("chk-2", false)];
         enqueue(&pool, &results).await.unwrap();
- 
+
         let count = pending_count(&pool).await.unwrap();
         assert_eq!(count, 2);
- 
+
         let rows = drain_pending(&pool, 10).await.unwrap();
         assert_eq!(rows.len(), 2);
- 
+
         // Deben estar en 'sending' ahora
         let still_pending = pending_count(&pool).await.unwrap();
         assert_eq!(still_pending, 0);
     }
- 
+
     #[tokio::test]
     async fn mark_sent_removes_from_pending() {
         let pool = connect_test().await;
- 
+
         enqueue(&pool, &[make_result("chk-1", true)]).await.unwrap();
         let rows = drain_pending(&pool, 10).await.unwrap();
         let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
- 
+
         mark_sent(&pool, &ids).await.unwrap();
- 
+
         let count = sqlx::query_scalar!("SELECT COUNT(*) FROM result_queue WHERE status = 'sent'")
             .fetch_one(&pool)
             .await
             .unwrap();
         assert_eq!(count, 1);
     }
- 
+
     #[tokio::test]
     async fn mark_failed_increments_retries() {
         let pool = connect_test().await;
- 
-        enqueue(&pool, &[make_result("chk-1", false)]).await.unwrap();
-        let rows = drain_pending(&pool, 10).await.unwrap();
-        let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
- 
-        mark_failed(&pool, &ids, "servidor rechazó").await.unwrap();
- 
-        let row = sqlx::query!("SELECT retries, error_detail FROM result_queue WHERE id = ?", ids[0])
-            .fetch_one(&pool)
+
+        enqueue(&pool, &[make_result("chk-1", false)])
             .await
             .unwrap();
- 
+        let rows = drain_pending(&pool, 10).await.unwrap();
+        let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
+
+        mark_failed(&pool, &ids, "servidor rechazó").await.unwrap();
+
+        let row = sqlx::query!(
+            "SELECT retries, error_detail FROM result_queue WHERE id = ?",
+            ids[0]
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
         assert_eq!(row.retries, 1);
         assert_eq!(row.error_detail.unwrap(), "servidor rechazó");
     }
- 
+
     #[tokio::test]
     async fn drain_respects_max_retries() {
         let pool = connect_test().await;
- 
-        enqueue(&pool, &[make_result("chk-exhausted", false)]).await.unwrap();
- 
+
+        enqueue(&pool, &[make_result("chk-exhausted", false)])
+            .await
+            .unwrap();
+
         // Agotamos los reintentos manualmente
         let rows = drain_pending(&pool, 10).await.unwrap();
         let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
- 
+
         // Marcamos como failed MAX_RETRIES veces
         for _ in 0..MAX_RETRIES {
             // Reseteamos a pending para poder drenar de nuevo
-            sqlx::query!("UPDATE result_queue SET status = 'pending' WHERE id = ?", ids[0])
-                .execute(&pool)
-                .await
-                .unwrap();
-            let drained = drain_pending(&pool, 10).await.unwrap();
-            mark_failed(&pool, &drained.iter().map(|r| r.id.clone()).collect::<Vec<_>>(), "error").await.unwrap();
-        }
- 
-        // A partir de aquí drain_pending no debe devolver este resultado
-        sqlx::query!("UPDATE result_queue SET status = 'pending' WHERE id = ?", ids[0])
+            sqlx::query!(
+                "UPDATE result_queue SET status = 'pending' WHERE id = ?",
+                ids[0]
+            )
             .execute(&pool)
             .await
             .unwrap();
- 
+            let drained = drain_pending(&pool, 10).await.unwrap();
+            mark_failed(
+                &pool,
+                &drained.iter().map(|r| r.id.clone()).collect::<Vec<_>>(),
+                "error",
+            )
+            .await
+            .unwrap();
+        }
+
+        // A partir de aquí drain_pending no debe devolver este resultado
+        sqlx::query!(
+            "UPDATE result_queue SET status = 'pending' WHERE id = ?",
+            ids[0]
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
         let drained = drain_pending(&pool, 10).await.unwrap();
-        assert!(drained.is_empty(), "no debe drenar resultados con MAX_RETRIES alcanzado");
+        assert!(
+            drained.is_empty(),
+            "no debe drenar resultados con MAX_RETRIES alcanzado"
+        );
     }
- 
+
     #[tokio::test]
     async fn reset_sending_to_pending_recovers_stuck() {
         let pool = connect_test().await;
- 
-        enqueue(&pool, &[make_result("chk-stuck", true)]).await.unwrap();
- 
+
+        enqueue(&pool, &[make_result("chk-stuck", true)])
+            .await
+            .unwrap();
+
         // Simulamos que el proceso muere durante un drain (queda en 'sending')
         drain_pending(&pool, 10).await.unwrap();
- 
+
         let sending_count: i64 =
             sqlx::query_scalar!("SELECT COUNT(*) FROM result_queue WHERE status = 'sending'")
                 .fetch_one(&pool)
                 .await
                 .unwrap();
         assert_eq!(sending_count, 1);
- 
+
         // Al arrancar de nuevo, se recuperan
         let recovered = reset_sending_to_pending(&pool).await.unwrap();
         assert_eq!(recovered, 1);
- 
+
         let pending = pending_count(&pool).await.unwrap();
         assert_eq!(pending, 1);
     }
- 
+
     #[tokio::test]
     async fn enqueue_empty_slice_is_noop() {
         let pool = connect_test().await;
@@ -448,5 +474,3 @@ mod tests {
         assert_eq!(pending_count(&pool).await.unwrap(), 0);
     }
 }
- 
-
