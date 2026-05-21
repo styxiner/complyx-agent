@@ -1,5 +1,6 @@
 [package]
-name = "agent-core"
+#name = "agent-core"
+name = "comlpyx-agent"
 description = "Complyx security agent"
 version = "0.1.0"
 edition = "2024"
@@ -59,7 +60,7 @@ pre_install_script = "packaging/scripts/rpm-pre.sh"
 post_install_script = "packaging/scripts/rpm-post.sh"
 pre_uninstall_script = "packaging/scripts/rpm-preun.sh"
 post_uninstall_script = "packaging/scripts/rpm-postun.sh"
-
+license = "LICENSE"
 # ---------------------------------------------------------------------------
 [dependencies]
 proto = { path = "../proto", features = ["client"] }
