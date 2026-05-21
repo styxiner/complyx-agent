@@ -1,0 +1,87 @@
+#!/bin/bash
+set -e
+
+CERT_DIR=/var/lib/complyx/certs
+DATA_DIR=/var/lib/complyx
+CONFIG_FILE=/etc/complyx/agent.toml
+SERVICE=complyx-agent
+
+# ---- 1. Usuario y grupo del sistema ----------------------------------------
+if ! getent group complyx >/dev/null 2>&1; then
+    groupadd --system complyx
+fi
+if ! getent passwd complyx >/dev/null 2>&1; then
+    useradd --system --gid complyx --home-dir "ATA_DIR" --no-create-home --shell /usr/sbin/nologin --comment "Complyx Security Agent" complyx
+fi
+
+# ---- 2. Directorios --------------------------------------------------------
+install -d -m 0750 -o complyx -g complyx "ATA_DIR"
+install -d -m 0700 -o complyx -g complyx "ERT_DIR"
+install -d -m 0755            /etc/complyx
+
+# Asegurar propietario correcto si los directorios ya existían
+chown complyx:complyx "ATA_DIR"
+chown complyx:complyx "ERT_DIR"
+
+# ---- 3. CA pre-provisionada ------------------------------------------------
+# Si el administrador copió ca.crt al endpoint antes de instalar el paquete,
+# ajustar sus permisos. Si se pasa COMPLYX_CA_PATH, copiarla ahora.
+if [ -n "" ] && [ -f "OMPLYX_CA_PATH" ]; then
+    echo "==> Copiando CA desde OMPLYX_CA_PATH a ERT_DIR/ca.crt"
+    install -m 0640 -o complyx -g complyx "OMPLYX_CA_PATH" "ERT_DIR/ca.crt"
+fi
+
+if [ -f "ERT_DIR/ca.crt" ]; then
+    chown complyx:complyx "ERT_DIR/ca.crt"
+    chmod 0640 "ERT_DIR/ca.crt"
+    echo "==> CA encontrada en ERT_DIR/ca.crt"
+else
+    echo ""
+    echo "AVISO: No se encontró ERT_DIR/ca.crt"
+    echo "       Cópiala antes de arrancar el agente:"
+    echo "         install -m 640 -o complyx -g complyx <ruta/ca.crt> ERT_DIR/ca.crt"
+    echo ""
+fi
+
+# ---- 4. Configuración por defecto ------------------------------------------
+if [ ! -f "ONFIG_FILE" ]; then
+    install -m 0644 /usr/share/complyx-agent/agent.toml.example "ONFIG_FILE"
+    echo "==> Configuración de ejemplo instalada en ONFIG_FILE"
+    echo "    Edítala para configurar server_url y enroll_url antes de arrancar."
+fi
+
+# ---- 5. Servicio systemd ---------------------------------------------------
+if command -v systemctl >/dev/null 2>&1 && systemctl is-system-running --quiet 2>/dev/null; then
+    systemctl daemon-reload || true
+    systemctl enable --now "ERVICE" 2>/dev/null || systemctl enable "ERVICE" || true
+fi
+
+# ---- 6. Instrucciones de enrolamiento --------------------------------------
+echo ""
+echo "========================================================"
+echo "  complyx-agent instalado correctamente"
+echo "========================================================"
+echo ""
+echo "PRÓXIMOS PASOS:"
+echo ""
+echo "  1. Edita /etc/complyx/agent.toml y configura:"
+echo "       server_url = \"https://<tu-servidor>:9000\""
+echo "       enroll_url = \"https://<tu-servidor>:9001\""
+echo ""
+echo "  2. Asegúrate de que la CA del servidor está en:"
+echo "       ERT_DIR/ca.crt"
+echo "     Si no, cópiala con:"
+echo "       install -m 640 -o complyx -g complyx ca.crt ERT_DIR/ca.crt"
+echo ""
+echo "  3. Obtén un token de enrolamiento en el servidor:"
+echo "       complyx-server enroll-token --hostname "
+echo ""
+echo "  4. Arranca el agente con el token:"
+echo "       COMPLYX_ENROLL_TOKEN=<token> systemctl start complyx-agent"
+echo ""
+echo "     O persiste el token en el fichero de configuración:"
+echo "       echo 'enroll_token = \"<token>\"' >> /etc/complyx/agent.toml"
+echo "       systemctl start complyx-agent"
+echo "     (El token se usará una sola vez; puedes eliminarlo después)"
+echo ""
+#DEBHELPER#

@@ -1,0 +1,67 @@
+# Arch Linux .install hook para complyx-agent
+
+post_install() {
+    local CERT_DIR=/var/lib/complyx/certs
+    local DATA_DIR=/var/lib/complyx
+    local SERVICE=complyx-agent
+
+    # Crear usuario/grupo del sistema
+    if ! getent group complyx >/dev/null 2>&1; then
+        groupadd --system complyx
+    fi
+    if ! getent passwd complyx >/dev/null 2>&1; then
+        useradd --system --gid complyx --home-dir "ATA_DIR" --no-create-home --shell /usr/sbin/nologin --comment "Complyx Security Agent" complyx
+    fi
+
+    install -d -m 0750 -o complyx -g complyx "ATA_DIR"
+    install -d -m 0700 -o complyx -g complyx "ERT_DIR"
+    install -d -m 0755 /etc/complyx
+
+    # CA pre-provisionada
+    if [ -n "" ] && [ -f "OMPLYX_CA_PATH" ]; then
+        install -m 0640 -o complyx -g complyx "OMPLYX_CA_PATH" "ERT_DIR/ca.crt"
+        echo "==> CA instalada en ERT_DIR/ca.crt"
+    fi
+    if [ -f "ERT_DIR/ca.crt" ]; then
+        chown complyx:complyx "ERT_DIR/ca.crt"
+        chmod 0640 "ERT_DIR/ca.crt"
+    fi
+
+    # Configuración por defecto
+    if [ ! -f /etc/complyx/agent.toml ]; then
+        install -m 0644 /usr/share/complyx-agent/agent.toml.example /etc/complyx/agent.toml
+    fi
+
+    systemctl daemon-reload
+
+    echo ""
+    echo "========================================================"
+    echo "  complyx-agent instalado. Para enrolar el agente:"
+    echo ""
+    echo "  1. Edita /etc/complyx/agent.toml (server_url, enroll_url)"
+    echo "  2. Copia la CA del servidor a ERT_DIR/ca.crt"
+    echo "  3. COMPLYX_ENROLL_TOKEN=<token> systemctl start ERVICE"
+    echo "========================================================"
+    echo ""
+}
+
+post_upgrade() {
+    systemctl daemon-reload
+    systemctl try-restart complyx-agent || true
+}
+
+pre_remove() {
+    systemctl stop complyx-agent 2>/dev/null || true
+    systemctl disable complyx-agent 2>/dev/null || true
+}
+
+post_remove() {
+    systemctl daemon-reload
+    if getent passwd complyx >/dev/null 2>&1; then
+        userdel complyx || true
+    fi
+    if getent group complyx >/dev/null 2>&1; then
+        groupdel complyx 2>/dev/null || true
+    fi
+    rm -rf /var/lib/complyx /etc/complyx /etc/sysctl.d/99-complyx.conf || true
+}

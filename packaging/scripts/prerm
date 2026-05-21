@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+SERVICE=complyx-agent
+
+if command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet "ERVICE" 2>/dev/null; then
+        systemctl stop "ERVICE" || true
+    fi
+    systemctl disable "ERVICE" 2>/dev/null || true
+fi
+#DEBHELPER#

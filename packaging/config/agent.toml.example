@@ -1,0 +1,49 @@
+# Configuración del agente Complyx
+#
+# Todas las claves pueden sobreescribirse con variables de entorno con prefijo COMPLYX_
+# Ejemplo: COMPLYX_SERVER_URL=https://mi-servidor:9000
+# =============================================================================
+# Conexión al servidor (OBLIGATORIO)
+# =============================================================================
+# URL del servicio gRPC principal (requiere mTLS)
+server_url = "https://localhost:9000"
+# URL del endpoint de enrolamiento (TLS one-way, solo se usa una vez)
+enroll_url = "https://localhost:9001"
+# =============================================================================
+# Identidad del agente
+# =============================================================================
+# Generado automáticamente durante el enrolamiento. No modificar manualmente.
+# agent_id = ""
+# =============================================================================
+# Certificados mTLS
+# =============================================================================
+# Directorio donde se almacenan agent.crt, agent.key y ca.crt
+cert_dir = "/var/lib/complyx/certs"
+# =============================================================================
+# Base de datos local
+# =============================================================================
+db_path = "/var/lib/complyx/agent.db"
+# =============================================================================
+# Timings
+# =============================================================================
+# Intervalo entre polls al servidor para obtener políticas (segundos)
+poll_interval_secs = 300 # 5 minutos
+# Intervalo entre intentos de flush de la cola de resultados (segundos)
+flush_interval_secs = 60 # 1 minuto
+# Intervalo entre heartbeats (segundos)
+heartbeat_interval_secs = 120 # 2 minutos
+# Días que se conservan los resultados ya enviados en la BD local antes de purgarlos
+result_purge_days = 7
+# =============================================================================
+# Remediación automática
+# =============================================================================
+# Si es false, el agente ejecuta checks pero NUNCA aplica remediaciones.
+# Útil en modo auditoría o cuando los cambios requieren aprobación previa.
+auto_remediate = true
+# =============================================================================
+# Logging
+# =============================================================================
+# Niveles: error | warn | info | debug | trace
+log_level = "info"
+# Formato de log: json (producción) | pretty (desarrollo)
+log_format = "json"

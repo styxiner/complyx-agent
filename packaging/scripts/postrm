@@ -1,0 +1,27 @@
+#!/bin/bash
+set -e
+
+CERT_DIR=/var/lib/complyx/certs
+DATA_DIR=/var/lib/complyx
+
+case "" in
+    purge)
+        echo "==> Eliminando datos del agente (purge)..."
+        rm -rf "ERT_DIR" "ATA_DIR" /etc/complyx /etc/sysctl.d/99-complyx.conf
+        if getent passwd complyx >/dev/null 2>&1; then
+            userdel complyx || true
+        fi
+        if getent group complyx >/dev/null 2>&1; then
+            groupdel complyx 2>/dev/null || true
+        fi
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl daemon-reload || true
+        fi
+        ;;
+    remove)
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl daemon-reload || true
+        fi
+        ;;
+esac
+#DEBHELPER#

@@ -1,5 +1,6 @@
 [package]
 name = "agent-core"
+description = "Complyx security agent"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,6 +8,10 @@ edition = "2024"
 name = "complyx-agent"
 path = "src/main.rs"
 
+# ---------------------------------------------------------------------------
+# cargo-deb  (make deb)
+# Paths relativos al Cargo.toml en crates/agent-core/ → ../../ para la raíz
+# ---------------------------------------------------------------------------
 [package.metadata.deb]
 maintainer = "Styxiner <@styxiner>"
 copyright = "2026, Styxiner <@styxiner>"
@@ -18,47 +23,50 @@ depends = "$auto"
 section = "utility"
 priority = "optional"
 assets = [
+  # El binario lo copia el Makefile a target/release/ antes de llamar a cargo-deb
   [
-    "target/release/complyx-agent",
-    "/usr/bin",
+    "../../target/release/complyx-agent",
+    "usr/bin/",
     "755",
   ],
   [
-    "config/agent.toml",
-    "etc/complyx/agent.toml",
+    "../../packaging/config/agent.toml.example",
+    "usr/share/complyx-agent/agent.toml.example",
     "644",
   ],
   [
-    "packagin/systemd/complyx-agent.service",
+    "../../packaging/systemd/complyx-agent.service",
     "usr/lib/systemd/system/",
     "644",
   ],
 ]
 conf-files = ["/etc/complyx/agent.toml"]
-maintainer-scripts = "packagin/debian/"
+# Los scripts postinst/prerm/postrm los genera `make scripts` en packaging/scripts/
+maintainer-scripts = "../../packaging/scripts/"
 systemd-units = [{ unit-name = "complyx-agent", enable = false }]
 
-[package.metadata.rpm]
-package = "complyx-agent"
+# ---------------------------------------------------------------------------
+# cargo-generate-rpm  (make rpm)
+# Con -p los assets se resuelven primero desde la raíz del workspace → sin ../../
+# ---------------------------------------------------------------------------
+[package.metadata.generate-rpm]
+assets = [
+  { source = "target/x86_64-unknown-linux-musl/dist/complyx-agent", dest = "/usr/bin/complyx-agent", mode = "755" },
+  { source = "packaging/systemd/complyx-agent.service", dest = "/usr/lib/systemd/system/complyx-agent.service", mode = "644" },
+  { source = "packaging/config/agent.toml.example", dest = "/usr/share/complyx-agent/agent.toml.example", mode = "644" },
+]
+pre_install_script = "packaging/scripts/rpm-pre.sh"
+post_install_script = "packaging/scripts/rpm-post.sh"
+pre_uninstall_script = "packaging/scripts/rpm-preun.sh"
+post_uninstall_script = "packaging/scripts/rpm-postun.sh"
 
-[package.metadata.rpm.cargo]
-buildflags = ["--release"]
-
-[package.metadata.rpm.targets]
-complyx-agent = { path = "/usr/bin/complyx-agent" }
-
-[package.metadata.rpm.files]
-"packagin/config/agent.toml" = { path = "/etc/complyx/agent.toml", mode = "644", config = true }
-"packaging/systemd/complyx-agent.service" = { path = "/usr/lib/systemd/system/complyx-agent.service", mode = "644" }
-
-
+# ---------------------------------------------------------------------------
 [dependencies]
 proto = { path = "../proto", features = ["client"] }
 grpc-client = { path = "../grpc-client" }
 policy-engine = { path = "../policy-engine" }
 remediation-engine = { path = "../remediation-engine" }
 local-db = { path = "../local-db" }
-
 tokio = { version = "1", features = [
   "macros",
   "rt-multi-thread",
@@ -66,23 +74,16 @@ tokio = { version = "1", features = [
   "time",
   "fs",
 ] }
-
 figment = { version = "0.10", features = ["toml", "env"] }
 serde = { version = "1", features = ["derive"] }
-
-#tracing = "0.1"
-#tracing-suscriber = {version = "0.3", features = ["env-filter", "json", "fmt"]}
-
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [
   "env-filter",
   "json",
   "fmt",
 ] }
-
 anyhow = "1"
 thiserror = "1"
-
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]

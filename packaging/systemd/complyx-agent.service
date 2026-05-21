@@ -1,0 +1,53 @@
+[Unit]
+Description=Complyx Security Agent
+Documentation=https://github.com/styxiner/complyx-agent
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=complyx
+Group=complyx
+
+ExecStart=/usr/bin/complyx-agent
+EnvironmentFile=-/etc/complyx/agent.env
+Environment=COMPLYX_CONFIG_PATH=/etc/complyx/agent.toml
+
+Restart=on-failure
+RestartSec=30s
+
+WorkingDirectory=/var/lib/complyx
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=complyx-agent
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/complyx /etc/sysctl.d
+ReadOnlyPaths=/etc /proc/sys /run/
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+
+SystemCallFilter=@system-service @file-system @network-io
+SystemCallFilter=~@privileged @obsolete @debug @reboot @swap @raw-io
+
+AmbientCapabilities=CAP_DAC_READ_SEARCH CAP_FOWNER CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_FOWNER CAP_NET_ADMIN
+
+ProtectKernelTunables=no
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectControlGroups=yes
+MemoryDenyWriteExecute=yes
+
+LimitNOFILE=4096
+LimitNPROC=64
+
+[Install]
+WantedBy=multi-user.target

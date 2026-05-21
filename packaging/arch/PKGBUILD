@@ -1,0 +1,45 @@
+# Maintainer: Styxiner <@styxiner>
+pkgname=complyx-agent
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Agente de gestión de cumplimiento normativo para endpoints Linux"
+arch=('x86_64')
+url="https://github.com/styxiner/complyx-agent"
+license=('custom')
+depends=()
+backup=('etc/complyx/agent.toml')
+install=complyx-agent.install
+# En el flujo de distribución real los sources apuntarían a la release de GitHub.
+# Para builds locales via 'make arch', makepkg consume los ficheros ya copiados
+# al directorio PKGBUILD por el target 'arch' del Makefile.
+source=(
+  "complyx-agent"
+  "complyx-agent.service"
+  "agent.toml.example"
+  "complyx-agent.install"
+)
+# Los checksums se actualizan con: makepkg -g >> PKGBUILD
+sha256sums=(
+  'SKIP'
+  'SKIP'
+  'SKIP'
+  'SKIP'
+)
+
+package() {
+  # Binario
+  install -Dm755 "$srcdir/complyx-agent" \
+    "$pkgdir/usr/bin/complyx-agent"
+
+  # Servicio systemd
+  install -Dm644 "$srcdir/complyx-agent.service" \
+    "$pkgdir/usr/lib/systemd/system/complyx-agent.service"
+
+  # Configuración de ejemplo (el .install hook la copia a /etc/complyx si no existe)
+  install -Dm644 "$srcdir/agent.toml.example" \
+    "$pkgdir/usr/share/complyx-agent/agent.toml.example"
+
+  # Licencia
+  install -Dm644 /dev/null \
+    "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
